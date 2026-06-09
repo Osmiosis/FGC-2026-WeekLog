@@ -5,10 +5,11 @@ import { Login } from "./auth/Login";
 import { Dashboard } from "./dashboard/Dashboard";
 import { CalendarView } from "./calendar/CalendarView";
 import { DeadlinesView } from "./deadlines/DeadlinesView";
+import { BrowseView } from "./browse/BrowseView";
 import { MembersAdmin } from "./admin/MembersAdmin";
 import { TemplatesAdmin } from "./admin/TemplatesAdmin";
 
-type Tab = "dashboard" | "calendar" | "deadlines" | "members" | "templates";
+type Tab = "dashboard" | "calendar" | "deadlines" | "browse" | "members" | "templates";
 
 function Shell() {
   const { session, email, isAdmin, loading, signOut } = useAuth();
@@ -59,6 +60,9 @@ function Shell() {
         <button onClick={() => go("deadlines")} disabled={tab === "deadlines"}>
           Deadlines
         </button>
+        <button onClick={() => go("browse")} disabled={tab === "browse"}>
+          Browse
+        </button>
         {isAdmin && (
           <>
             <button onClick={() => go("members")} disabled={tab === "members"}>
@@ -74,6 +78,7 @@ function Shell() {
       {tab === "dashboard" && <Dashboard onOpenDay={openDay} onGoToDeadlines={() => go("deadlines")} />}
       {tab === "calendar" && <CalendarView initialOpenDayId={calendarDayId} />}
       {tab === "deadlines" && <DeadlinesView />}
+      {tab === "browse" && <BrowseView onOpenDay={openDay} />}
       {tab === "members" && isAdmin && <MembersAdmin />}
       {tab === "templates" && isAdmin && <TemplatesAdmin />}
     </main>
