@@ -1,0 +1,14 @@
+
+ ⛅️ wrangler 4.98.0
+───────────────────
+Using secrets defined in .dev.vars
+Your Worker has access to the following bindings:
+Binding                                                                 Resource                  Mode
+env.DB (weeklog)                                                        D1 Database               local
+env.MEDIA (weeklog-media)                                               R2 Bucket                 local
+env.SUPABASE_URL ("https://euzvqdnonmkechsdtryr.supabase...")           Environment Variable      local
+env.ADMIN_EMAIL ("vibha.aarav@gmail.com")                               Environment Variable      local
+env.SUPABASE_ANON_KEY ("(hidden)")                                      Environment Variable      local
+
+⎔ Starting local server...
+[wrangler:info] Ready on http://127.0.0.1:8788
