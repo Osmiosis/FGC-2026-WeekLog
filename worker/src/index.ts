@@ -47,5 +47,12 @@ app.route("/api/build-needs", buildNeeds);
 app.route("/api/export", exports);
 app.route("/api/drive", driveRoutes);
 
+// Surface the real error: log the stack (visible via `wrangler tail`) and return
+// the message instead of an opaque "Internal Server Error".
+app.onError((err, c) => {
+  console.error("API error:", err.stack ?? String(err));
+  return c.json({ error: err.message || "Internal Server Error" }, 500);
+});
+
 export default app;
 export type { Env } from "./bindings";

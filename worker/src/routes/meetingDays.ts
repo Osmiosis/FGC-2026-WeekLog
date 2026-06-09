@@ -10,6 +10,7 @@ import {
 } from "../dayStatus";
 import { zipSync, strToU8 } from "fflate";
 import { buildDaySummary } from "../summary";
+import { checkStorageBudget } from "../storage";
 import { cleanFileName, uniquePath } from "../names";
 
 export const meetingDays = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -184,13 +185,17 @@ meetingDays.post("/:id/media", requireUser, async (c) => {
   if (!(file instanceof File)) return c.json({ error: "file required" }, 400);
 
   const str = (k: string) => (typeof form[k] === "string" ? (form[k] as string) : null);
+  const buf = await file.arrayBuffer();
+  const budget = await checkStorageBudget(c.env, buf.byteLength);
+  if (!budget.ok) return c.json({ error: budget.error }, budget.status);
+
   const mediaId = crypto.randomUUID();
   const key = `days/${id}/${mediaId}-${file.name}`;
-  await c.env.MEDIA.put(key, await file.arrayBuffer());
+  await c.env.MEDIA.put(key, buf);
 
   const user = c.get("user");
   await c.env.DB.prepare(
-    "INSERT INTO media (id, meeting_day_id, deadline_id, requirement_id, subsystem, r2_key, caption, kind, content_type, uploaded_at, uploaded_by) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO media (id, meeting_day_id, deadline_id, requirement_id, subsystem, r2_key, caption, kind, content_type, bytes, uploaded_at, uploaded_by) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   )
     .bind(
       mediaId,
@@ -201,6 +206,7 @@ meetingDays.post("/:id/media", requireUser, async (c) => {
       str("caption"),
       str("kind"),
       file.type || null,
+      buf.byteLength,
       new Date().toISOString(),
       user.email
     )
