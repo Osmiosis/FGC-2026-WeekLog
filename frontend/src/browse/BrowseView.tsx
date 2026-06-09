@@ -1,29 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
-import { api } from "../api";
+import { useState } from "react";
+import {
+  useBuildNeeds,
+  useSearch,
+  SUBSYSTEMS,
+  SUBMISSION_KINDS,
+} from "../lib/hooks/useBrowse";
+import type { Submission } from "../lib/hooks/types";
 
-interface Sub {
-  id: string;
-  kind: string;
-  subsystem: string | null;
-  content: string | null;
-  created_by: string | null;
-  date: string;
-  day_id?: string;
-  meeting_day_id?: string;
-  resolved?: number;
-}
-
-const SUBSYSTEMS = [
-  "",
-  "Drivetrain/Collector",
-  "Shooter",
-  "Climber",
-  "Practice Arena",
-  "Programming",
-  "Strategy",
-];
-const KINDS = ["", "accomplishment", "build_need", "performance_goal", "failure", "note"];
 const STATUSES = ["", "green", "amber", "red"];
+
+function dayIdOf(s: Submission): string {
+  return (s.meeting_day_id ?? s.day_id) as string;
+}
 
 export function BrowseView({ onOpenDay }: { onOpenDay: (id: string) => void }) {
   return (
@@ -35,21 +23,8 @@ export function BrowseView({ onOpenDay }: { onOpenDay: (id: string) => void }) {
 }
 
 function OpenBuildNeeds({ onOpenDay }: { onOpenDay: (id: string) => void }) {
-  const [rows, setRows] = useState<Sub[]>([]);
   const [showResolved, setShowResolved] = useState(false);
-
-  const load = useCallback(() => {
-    const path = showResolved ? "/api/build-needs" : "/api/build-needs?open=1";
-    api<Sub[]>(path).then(setRows).catch(() => {});
-  }, [showResolved]);
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const resolve = async (s: Sub, resolved: boolean) => {
-    await api(`/api/submissions/${s.id}/${resolved ? "resolve" : "unresolve"}`, { method: "POST" });
-    load();
-  };
+  const { rows, setResolved } = useBuildNeeds(showResolved);
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -81,11 +56,11 @@ function OpenBuildNeeds({ onOpenDay }: { onOpenDay: (id: string) => void }) {
                 <div style={{ fontSize: 12, color: "#666" }}>{s.date}</div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => onOpenDay((s.meeting_day_id ?? s.day_id)!)}>Open day</button>
+                <button onClick={() => onOpenDay(dayIdOf(s))}>Open day</button>
                 {s.resolved ? (
-                  <button onClick={() => resolve(s, false)}>Reopen</button>
+                  <button onClick={() => setResolved(s.id, false)}>Reopen</button>
                 ) : (
-                  <button onClick={() => resolve(s, true)}>Resolve</button>
+                  <button onClick={() => setResolved(s.id, true)}>Resolve</button>
                 )}
               </div>
             </li>
@@ -97,27 +72,13 @@ function OpenBuildNeeds({ onOpenDay }: { onOpenDay: (id: string) => void }) {
 }
 
 function Search({ onOpenDay }: { onOpenDay: (id: string) => void }) {
+  const { results, ran, run } = useSearch();
   const [q, setQ] = useState("");
   const [subsystem, setSubsystem] = useState("");
   const [kind, setKind] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState("");
-  const [rows, setRows] = useState<Sub[]>([]);
-  const [ran, setRan] = useState(false);
-
-  const run = async () => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (subsystem) params.set("subsystem", subsystem);
-    if (kind) params.set("kind", kind);
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    if (status) params.set("status", status);
-    const res = await api<Sub[]>(`/api/search?${params.toString()}`);
-    setRows(res);
-    setRan(true);
-  };
 
   return (
     <div>
@@ -125,16 +86,18 @@ function Search({ onOpenDay }: { onOpenDay: (id: string) => void }) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
         <input placeholder="Text" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={subsystem} onChange={(e) => setSubsystem(e.target.value)}>
+          <option value="">any subsystem</option>
           {SUBSYSTEMS.map((s) => (
             <option key={s} value={s}>
-              {s || "any subsystem"}
+              {s}
             </option>
           ))}
         </select>
         <select value={kind} onChange={(e) => setKind(e.target.value)}>
-          {KINDS.map((k) => (
+          <option value="">any kind</option>
+          {SUBMISSION_KINDS.map((k) => (
             <option key={k} value={k}>
-              {k || "any kind"}
+              {k}
             </option>
           ))}
         </select>
@@ -151,19 +114,19 @@ function Search({ onOpenDay }: { onOpenDay: (id: string) => void }) {
         <label style={{ fontSize: 13 }}>
           To <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
-        <button onClick={run}>Search</button>
+        <button onClick={() => run({ q, subsystem, kind, from, to, status })}>Search</button>
       </div>
 
-      {ran && rows.length === 0 && <p>No matches.</p>}
+      {ran && results.length === 0 && <p>No matches.</p>}
       <ul style={{ listStyle: "none", padding: 0 }}>
-        {rows.map((s) => (
+        {results.map((s) => (
           <li key={s.id} style={{ padding: 8, borderBottom: "1px solid #eee" }}>
             <strong>{s.kind}</strong>
             {s.subsystem ? ` [${s.subsystem}]` : ""}: {s.content}{" "}
             <span style={{ color: "#777", fontSize: 12 }}>
               {s.date} {s.created_by}
             </span>{" "}
-            <button onClick={() => onOpenDay((s.meeting_day_id ?? s.day_id)!)}>open day</button>
+            <button onClick={() => onOpenDay(dayIdOf(s))}>open day</button>
           </li>
         ))}
       </ul>

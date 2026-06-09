@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { supabase } from "../supabase";
+import { useAuth } from "./AuthProvider";
 
 const card: React.CSSProperties = {
   fontFamily: "system-ui",
@@ -14,6 +14,7 @@ const input: React.CSSProperties = { padding: 8, width: "100%", boxSizing: "bord
 const btn: React.CSSProperties = { padding: "8px 12px", cursor: "pointer" };
 
 export function Login() {
+  const { sendMagicLink } = useAuth();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,15 +22,11 @@ export function Login() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
     setBusy(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
+    const { error } = await sendMagicLink(email);
     setBusy(false);
-    if (error) setError(error.message);
+    if (error) setError(error);
     else setSent(true);
   };
 

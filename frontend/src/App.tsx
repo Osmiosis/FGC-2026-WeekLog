@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isConfigured } from "./supabase";
+import { isConfigured } from "./lib/supabase";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { Login } from "./auth/Login";
 import { Dashboard } from "./dashboard/Dashboard";

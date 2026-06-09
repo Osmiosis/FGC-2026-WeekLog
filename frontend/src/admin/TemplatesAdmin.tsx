@@ -1,77 +1,35 @@
-import { useEffect, useState } from "react";
-import { api } from "../api";
-
-interface Template {
-  id: string;
-  label: string;
-  description: string | null;
-  compulsory: number;
-  expected_kind: string | null;
-  active: number;
-  sort_order: number | null;
-}
-
-const KINDS = ["attendance", "text", "media", "any"];
+import { useState } from "react";
+import { useTemplates, EXPECTED_KINDS } from "../lib/hooks/useTemplates";
+import type { Template } from "../lib/hooks/types";
 
 export function TemplatesAdmin() {
-  const [items, setItems] = useState<Template[]>([]);
+  const { templates, error, add, patch, reorder } = useTemplates();
   const [label, setLabel] = useState("");
   const [kind, setKind] = useState("text");
   const [compulsory, setCompulsory] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
 
-  const load = () =>
-    api<Template[]>("/api/requirement-templates")
-      .then(setItems)
-      .catch((e) => setErr(String(e)));
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  const add = async () => {
+  const onAdd = async () => {
     if (!label) return;
-    await api("/api/requirement-templates", {
-      method: "POST",
-      body: JSON.stringify({
-        label,
-        expected_kind: kind,
-        compulsory: compulsory ? 1 : 0,
-      }),
-    });
+    await add(label, kind, compulsory);
     setLabel("");
-    load();
   };
 
-  const patch = async (t: Template, body: Partial<Template>) => {
-    await api(`/api/requirement-templates/${t.id}`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    });
-    load();
-  };
-
-  const move = async (index: number, dir: -1 | 1) => {
-    const next = [...items];
+  const move = (index: number, dir: -1 | 1) => {
+    const next = [...templates];
     const j = index + dir;
     if (j < 0 || j >= next.length) return;
     [next[index], next[j]] = [next[j], next[index]];
-    setItems(next);
-    await api("/api/requirement-templates/reorder", {
-      method: "POST",
-      body: JSON.stringify({ ids: next.map((t) => t.id) }),
-    });
-    load();
+    reorder(next);
   };
 
   return (
     <section>
       <h2>Requirement templates</h2>
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} />
         <select value={kind} onChange={(e) => setKind(e.target.value)}>
-          {KINDS.map((k) => (
+          {EXPECTED_KINDS.map((k) => (
             <option key={k}>{k}</option>
           ))}
         </select>
@@ -83,7 +41,7 @@ export function TemplatesAdmin() {
           />{" "}
           Compulsory
         </label>
-        <button onClick={add}>Add</button>
+        <button onClick={onAdd}>Add</button>
       </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
@@ -97,13 +55,13 @@ export function TemplatesAdmin() {
           </tr>
         </thead>
         <tbody>
-          {items.map((t, i) => (
+          {templates.map((t: Template, i) => (
             <tr key={t.id} style={{ opacity: t.active ? 1 : 0.5 }}>
               <td align="center">
                 <button onClick={() => move(i, -1)} disabled={i === 0}>
                   up
                 </button>
-                <button onClick={() => move(i, 1)} disabled={i === items.length - 1}>
+                <button onClick={() => move(i, 1)} disabled={i === templates.length - 1}>
                   down
                 </button>
               </td>
@@ -113,12 +71,12 @@ export function TemplatesAdmin() {
                 <input
                   type="checkbox"
                   checked={!!t.compulsory}
-                  onChange={() => patch(t, { compulsory: t.compulsory ? 0 : 1 })}
+                  onChange={() => patch(t.id, { compulsory: t.compulsory ? 0 : 1 })}
                 />
               </td>
               <td align="center">{t.active ? "yes" : "no"}</td>
               <td>
-                <button onClick={() => patch(t, { active: t.active ? 0 : 1 })}>
+                <button onClick={() => patch(t.id, { active: t.active ? 0 : 1 })}>
                   {t.active ? "Deactivate" : "Reactivate"}
                 </button>
               </td>

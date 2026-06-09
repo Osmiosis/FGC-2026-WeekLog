@@ -1,28 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, downloadAuthed } from "../api";
-
-type Rag = "green" | "amber" | "red";
-
-interface Dash {
-  today: string;
-  overall: Rag;
-  counts: { daysFlagged: number; deadlinesOverdue: number; deadlinesDueSoon: number };
-  needsAttention: Array<{
-    type: "day" | "deadline";
-    id: string;
-    date?: string;
-    due_date?: string;
-    label: string;
-  }>;
-  thisWeek: Array<{ id: string; date: string; status: Rag }>;
-  upcomingDeadlines: Array<{
-    id: string;
-    title: string;
-    due_date: string;
-    status: Rag;
-    daysUntil: number;
-  }>;
-}
+import { useDashboard } from "../lib/hooks/useDashboard";
+import type { Rag } from "../lib/hooks/types";
 
 const RAG: Record<Rag, { bg: string; border: string; text: string }> = {
   green: { bg: "#e7f6e9", border: "#2f9e44", text: "All on track" },
@@ -37,14 +14,9 @@ export function Dashboard({
   onOpenDay: (id: string) => void;
   onGoToDeadlines: () => void;
 }) {
-  const [d, setD] = useState<Dash | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const { data: d, driveConfigured, error, downloadAllMedia } = useDashboard();
 
-  useEffect(() => {
-    api<Dash>("/api/dashboard").then(setD).catch((e) => setErr(String(e)));
-  }, []);
-
-  if (err) return <p style={{ color: "crimson" }}>{err}</p>;
+  if (error) return <p style={{ color: "crimson" }}>{error}</p>;
   if (!d) return <p>Loading...</p>;
 
   const rag = RAG[d.overall];
@@ -142,31 +114,15 @@ export function Dashboard({
         </ul>
       )}
 
-      <ExportAndBackup />
+      <div style={{ marginTop: 28, paddingTop: 16, borderTop: "1px solid #eee" }}>
+        <h3>Export and backup</h3>
+        <button onClick={downloadAllMedia}>Download all media (ZIP)</button>
+        <p style={{ fontSize: 13, color: "#555", marginTop: 8 }}>
+          {driveConfigured
+            ? "Drive sync is configured."
+            : "Drive sync is not configured. Download a ZIP and upload it to the mentors' Drive manually."}
+        </p>
+      </div>
     </section>
-  );
-}
-
-function ExportAndBackup() {
-  const [driveConfigured, setDriveConfigured] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    api<{ configured: boolean }>("/api/drive/status")
-      .then((s) => setDriveConfigured(s.configured))
-      .catch(() => setDriveConfigured(false));
-  }, []);
-
-  return (
-    <div style={{ marginTop: 28, paddingTop: 16, borderTop: "1px solid #eee" }}>
-      <h3>Export and backup</h3>
-      <button onClick={() => downloadAuthed("/api/export/all-media/zip", "all-media.zip")}>
-        Download all media (ZIP)
-      </button>
-      <p style={{ fontSize: 13, color: "#555", marginTop: 8 }}>
-        {driveConfigured
-          ? "Drive sync is configured."
-          : "Drive sync is not configured. Download a ZIP and upload it to the mentors' Drive manually."}
-      </p>
-    </div>
   );
 }

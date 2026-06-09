@@ -3,9 +3,10 @@
   "private": true,
   "workspaces": ["types", "worker", "frontend"],
   "scripts": {
-    "test": "npm run test --workspace @weeklog/worker",
+    "test": "npm run test --workspace @weeklog/worker && npm run test --workspace @weeklog/frontend",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspace @weeklog/frontend",
+    "verify": "npm run typecheck && npm run test && npm run build",
     "migrate:local": "wrangler d1 migrations apply weeklog --local",
     "migrate:remote": "wrangler d1 migrations apply weeklog --remote",
     "seed:local": "wrangler d1 execute weeklog --local --file worker/seed/roster.sql",

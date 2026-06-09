@@ -1,22 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../api";
+import { useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
+import { useCalendar } from "../lib/hooks/useCalendar";
+import { ymd, daysInMonth, firstWeekday } from "../lib/dates";
+import type { Rag } from "../lib/hooks/types";
 import { MeetingDayDetail } from "./MeetingDayDetail";
-
-type Rag = "green" | "amber" | "red";
-
-interface MeetingDay {
-  id: string;
-  date: string;
-  title: string | null;
-  status: Rag;
-}
-
-const RAG: Record<Rag, { bg: string; border: string; label: string }> = {
-  green: { bg: "#e7f6e9", border: "#2f9e44", label: "complete" },
-  amber: { bg: "#fff4e0", border: "#e8a317", label: "in progress" },
-  red: { bg: "#fdeaea", border: "#d6336c", label: "missing" },
-};
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -24,18 +11,11 @@ const MONTHS = [
 ];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Zero-padded YYYY-MM-DD without timezone conversion.
-function ymd(year: number, month: number, day: number): string {
-  const m = String(month + 1).padStart(2, "0");
-  const d = String(day).padStart(2, "0");
-  return `${year}-${m}-${d}`;
-}
-function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-}
-function firstWeekday(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 1)).getUTCDay();
-}
+const RAG: Record<Rag, { bg: string; border: string; label: string }> = {
+  green: { bg: "#e7f6e9", border: "#2f9e44", label: "complete" },
+  amber: { bg: "#fff4e0", border: "#e8a317", label: "in progress" },
+  red: { bg: "#fdeaea", border: "#d6336c", label: "missing" },
+};
 
 const cell: React.CSSProperties = {
   border: "1px solid #ddd",
@@ -50,57 +30,19 @@ export function CalendarView({ initialOpenDayId }: { initialOpenDayId?: string |
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [marked, setMarked] = useState<Map<string, MeetingDay>>(new Map());
-  const [err, setErr] = useState<string | null>(null);
   const [openDayId, setOpenDayId] = useState<string | null>(initialOpenDayId ?? null);
+  const { marked, error, reload, markDay } = useCalendar(year, month);
 
-  useEffect(() => {
-    if (initialOpenDayId) setOpenDayId(initialOpenDayId);
-  }, [initialOpenDayId]);
+  const prev = () => (month === 0 ? (setYear(year - 1), setMonth(11)) : setMonth(month - 1));
+  const next = () => (month === 11 ? (setYear(year + 1), setMonth(0)) : setMonth(month + 1));
 
-  const load = useCallback(async () => {
-    setErr(null);
-    const from = ymd(year, month, 1);
-    const to = ymd(year, month, daysInMonth(year, month));
-    try {
-      const rows = await api<MeetingDay[]>(`/api/meeting-days?from=${from}&to=${to}`);
-      setMarked(new Map(rows.map((r) => [r.date, r])));
-    } catch (e) {
-      setErr(String(e));
-    }
-  }, [year, month]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const prev = () => {
-    if (month === 0) {
-      setYear(year - 1);
-      setMonth(11);
-    } else setMonth(month - 1);
-  };
-  const next = () => {
-    if (month === 11) {
-      setYear(year + 1);
-      setMonth(0);
-    } else setMonth(month + 1);
-  };
-
-  // Clicking a marked day opens its detail. Clicking an unmarked day marks it (admin only).
   const clickDay = async (date: string) => {
     const existing = marked.get(date);
     if (existing) {
       setOpenDayId(existing.id);
       return;
     }
-    if (!isAdmin) return;
-    try {
-      await api("/api/meeting-days", { method: "POST", body: JSON.stringify({ date }) });
-      await load();
-    } catch (e) {
-      setErr(String(e));
-    }
+    if (isAdmin) await markDay(date);
   };
 
   const total = daysInMonth(year, month);
@@ -118,11 +60,7 @@ export function CalendarView({ initialOpenDayId }: { initialOpenDayId?: string |
         dayId={openDayId}
         onBack={() => {
           setOpenDayId(null);
-          load();
-        }}
-        onUnmarked={() => {
-          setOpenDayId(null);
-          load();
+          reload();
         }}
       />
     );
@@ -137,7 +75,7 @@ export function CalendarView({ initialOpenDayId }: { initialOpenDayId?: string |
         </h2>
         <button onClick={next}>Next</button>
       </div>
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
       <p style={{ fontSize: 13, color: "#555" }}>
         {isAdmin
           ? "Tap an empty day to mark it as a meeting day. Tap a meeting day to open its checklist."
@@ -186,71 +124,12 @@ export function CalendarView({ initialOpenDayId }: { initialOpenDayId?: string |
             >
               <div>{d}</div>
               {meeting && rag && (
-                <div style={{ fontSize: 11, color: rag.border, textAlign: "left" }}>
-                  {rag.label}
-                </div>
+                <div style={{ fontSize: 11, color: rag.border, textAlign: "left" }}>{rag.label}</div>
               )}
             </div>
           );
         })}
       </div>
-
-      {isAdmin && <BulkMark onDone={load} />}
     </section>
-  );
-}
-
-function BulkMark({ onDone }: { onDone: () => void }) {
-  const [days, setDays] = useState<Set<number>>(new Set([2, 4]));
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const toggle = (n: number) => {
-    const next = new Set(days);
-    if (next.has(n)) next.delete(n);
-    else next.add(n);
-    setDays(next);
-  };
-
-  const submit = async () => {
-    setMsg(null);
-    if (!start || !end || days.size === 0) {
-      setMsg("Pick a start date, an end date, and at least one weekday.");
-      return;
-    }
-    try {
-      const out = await api<{ created: number; skipped: number }>(
-        "/api/meeting-days/bulk",
-        { method: "POST", body: JSON.stringify({ start, end, weekdays: [...days] }) }
-      );
-      setMsg(`Created ${out.created} meeting days (skipped ${out.skipped} already marked).`);
-      onDone();
-    } catch (e) {
-      setMsg(String(e));
-    }
-  };
-
-  return (
-    <div style={{ marginTop: 20, padding: 12, border: "1px solid #ddd" }}>
-      <h3 style={{ marginTop: 0 }}>Bulk mark a recurring schedule</h3>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {WEEKDAYS.map((w, n) => (
-          <label key={w} style={{ fontSize: 13 }}>
-            <input type="checkbox" checked={days.has(n)} onChange={() => toggle(n)} /> {w}
-          </label>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <label style={{ fontSize: 13 }}>
-          From <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-        </label>
-        <label style={{ fontSize: 13 }}>
-          To <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
-        </label>
-        <button onClick={submit}>Mark days</button>
-      </div>
-      {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
-    </div>
   );
 }

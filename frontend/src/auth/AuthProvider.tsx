@@ -1,3 +1,7 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// PROTECTED WIRING — do not edit during design work.
+// Owns the auth session and role. Build login/role UI on top of useAuth().
+// ─────────────────────────────────────────────────────────────────────────────
 import {
   createContext,
   useContext,
@@ -6,8 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../supabase";
-import { api } from "../api";
+import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
 
 interface AuthState {
   session: Session | null;
@@ -15,6 +19,8 @@ interface AuthState {
   isAdmin: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
+  // Send a passwordless magic link to the given email.
+  sendMagicLink: (email: string) => Promise<{ error: string | null }>;
 }
 
 const Ctx = createContext<AuthState | undefined>(undefined);
@@ -44,8 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
       return;
     }
-    // Only trust a successful response. A transient failure (e.g. a token mid
-    // refresh) must NOT demote an admin to member; keep the prior value.
+    // Only trust a successful response; a transient failure must not demote.
     api<{ email: string; isAdmin: boolean }>("/api/me")
       .then((me) => setIsAdmin(me.isAdmin))
       .catch(() => {});
@@ -53,6 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase?.auth.signOut();
+  };
+
+  const sendMagicLink = async (email: string) => {
+    if (!supabase) return { error: "Auth is not configured." };
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    return { error: error ? error.message : null };
   };
 
   return (
@@ -63,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         loading,
         signOut,
+        sendMagicLink,
       }}
     >
       {children}

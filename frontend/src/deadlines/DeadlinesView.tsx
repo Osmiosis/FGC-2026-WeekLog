@@ -1,62 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, apiForm, apiBlobUrl } from "../api";
+import { useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
+import { useDeadlines, useDeadlineProof, DEADLINE_CATEGORIES } from "../lib/hooks/useDeadlines";
+import { useMediaUrl } from "../lib/hooks/useMediaUrl";
+import type { Deadline, MediaRow, Rag } from "../lib/hooks/types";
 
-type Rag = "green" | "amber" | "red";
-
-interface Deadline {
-  id: string;
-  title: string;
-  description: string | null;
-  category: string | null;
-  due_date: string;
-  status: string;
-  status_rag: Rag;
-  link: string | null;
-}
-interface MediaRow {
-  id: string;
-  caption: string | null;
-  content_type: string | null;
-}
-
-const CATEGORIES = ["social_media", "design", "strategy", "other"];
 const RAG_BORDER: Record<Rag, string> = { green: "#2f9e44", amber: "#e8a317", red: "#d6336c" };
 
 export function DeadlinesView() {
   const { isAdmin } = useAuth();
-  const [items, setItems] = useState<Deadline[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    api<Deadline[]>("/api/deadlines").then(setItems).catch((e) => setErr(String(e)));
-  }, []);
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const markDone = async (d: Deadline) => {
-    await api(`/api/deadlines/${d.id}/done`, { method: "POST" });
-    load();
-  };
-  const reopen = async (d: Deadline) => {
-    await api(`/api/deadlines/${d.id}/reopen`, { method: "POST" });
-    load();
-  };
-  const remove = async (d: Deadline) => {
-    if (!confirm(`Delete "${d.title}"?`)) return;
-    await api(`/api/deadlines/${d.id}`, { method: "DELETE" });
-    load();
-  };
+  const { deadlines, error, markDone, reopen, remove } = useDeadlines();
 
   return (
     <section>
       <h2>Deadlines</h2>
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
-      {isAdmin && <CreateDeadline onDone={load} />}
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {isAdmin && <CreateDeadline />}
 
       <ul style={{ listStyle: "none", padding: 0 }}>
-        {items.map((d) => (
+        {deadlines.map((d: Deadline) => (
           <li
             key={d.id}
             style={{ borderLeft: `6px solid ${RAG_BORDER[d.status_rag]}`, padding: 12, margin: "8px 0", background: "#fafafa" }}
@@ -76,12 +37,12 @@ export function DeadlinesView() {
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" }}>
                 {d.status !== "done" ? (
-                  <button onClick={() => markDone(d)}>Mark done</button>
+                  <button onClick={() => markDone(d.id)}>Mark done</button>
                 ) : (
-                  isAdmin && <button onClick={() => reopen(d)}>Reopen</button>
+                  isAdmin && <button onClick={() => reopen(d.id)}>Reopen</button>
                 )}
                 {isAdmin && (
-                  <button onClick={() => remove(d)} style={{ color: "crimson" }}>
+                  <button onClick={() => remove(d.id)} style={{ color: "crimson" }}>
                     Delete
                   </button>
                 )}
@@ -95,22 +56,19 @@ export function DeadlinesView() {
   );
 }
 
-function CreateDeadline({ onDone }: { onDone: () => void }) {
+function CreateDeadline() {
+  const { create } = useDeadlines();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [category, setCategory] = useState(DEADLINE_CATEGORIES[0]);
   const [link, setLink] = useState("");
 
-  const create = async () => {
+  const onCreate = async () => {
     if (!title || !dueDate) return;
-    await api("/api/deadlines", {
-      method: "POST",
-      body: JSON.stringify({ title, due_date: dueDate, category, link: link || undefined }),
-    });
+    await create({ title, due_date: dueDate, category, link });
     setTitle("");
     setDueDate("");
     setLink("");
-    onDone();
   };
 
   return (
@@ -118,38 +76,27 @@ function CreateDeadline({ onDone }: { onDone: () => void }) {
       <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
       <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
       <select value={category} onChange={(e) => setCategory(e.target.value)}>
-        {CATEGORIES.map((c) => (
+        {DEADLINE_CATEGORIES.map((c) => (
           <option key={c}>{c}</option>
         ))}
       </select>
       <input placeholder="Reference link (optional)" value={link} onChange={(e) => setLink(e.target.value)} />
-      <button onClick={create}>Add deadline</button>
+      <button onClick={onCreate}>Add deadline</button>
     </div>
   );
 }
 
 function Proof({ deadlineId }: { deadlineId: string }) {
-  const [rows, setRows] = useState<MediaRow[]>([]);
+  const { rows, upload } = useDeadlineProof(deadlineId);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(() => {
-    api<MediaRow[]>(`/api/deadlines/${deadlineId}/media`).then(setRows).catch(() => {});
-  }, [deadlineId]);
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const upload = async () => {
+  const submit = async () => {
     if (!file) return;
     setBusy(true);
-    const form = new FormData();
-    form.set("file", file);
-    form.set("kind", "doc");
     try {
-      await apiForm(`/api/deadlines/${deadlineId}/media`, form);
+      await upload(file);
       setFile(null);
-      load();
     } finally {
       setBusy(false);
     }
@@ -160,12 +107,12 @@ function Proof({ deadlineId }: { deadlineId: string }) {
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, color: "#555" }}>Proof:</span>
         <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        <button onClick={upload} disabled={!file || busy}>
+        <button onClick={submit} disabled={!file || busy}>
           {busy ? "Uploading..." : "Attach"}
         </button>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-        {rows.map((m) => (
+        {rows.map((m: MediaRow) => (
           <Thumb key={m.id} row={m} />
         ))}
       </div>
@@ -174,23 +121,7 @@ function Proof({ deadlineId }: { deadlineId: string }) {
 }
 
 function Thumb({ row }: { row: MediaRow }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    let made: string | null = null;
-    apiBlobUrl(`/api/media/${row.id}/file`)
-      .then((u) => {
-        made = u;
-        if (live) setUrl(u);
-        else URL.revokeObjectURL(u);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-      if (made) URL.revokeObjectURL(made);
-    };
-  }, [row.id]);
-
+  const url = useMediaUrl(row.id);
   const isImage = (row.content_type ?? "").startsWith("image/");
   if (!url) return <div style={{ width: 90, height: 64, background: "#eee" }} />;
   return isImage ? (
