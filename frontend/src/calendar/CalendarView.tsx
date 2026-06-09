@@ -45,14 +45,18 @@ const cell: React.CSSProperties = {
   fontSize: 13,
 };
 
-export function CalendarView() {
+export function CalendarView({ initialOpenDayId }: { initialOpenDayId?: string | null } = {}) {
   const { isAdmin } = useAuth();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [marked, setMarked] = useState<Map<string, MeetingDay>>(new Map());
   const [err, setErr] = useState<string | null>(null);
-  const [openDayId, setOpenDayId] = useState<string | null>(null);
+  const [openDayId, setOpenDayId] = useState<string | null>(initialOpenDayId ?? null);
+
+  useEffect(() => {
+    if (initialOpenDayId) setOpenDayId(initialOpenDayId);
+  }, [initialOpenDayId]);
 
   const load = useCallback(async () => {
     setErr(null);

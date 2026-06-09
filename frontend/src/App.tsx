@@ -2,15 +2,27 @@ import { useState } from "react";
 import { isConfigured } from "./supabase";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { Login } from "./auth/Login";
+import { Dashboard } from "./dashboard/Dashboard";
 import { CalendarView } from "./calendar/CalendarView";
+import { DeadlinesView } from "./deadlines/DeadlinesView";
 import { MembersAdmin } from "./admin/MembersAdmin";
 import { TemplatesAdmin } from "./admin/TemplatesAdmin";
 
-type Tab = "calendar" | "members" | "templates";
+type Tab = "dashboard" | "calendar" | "deadlines" | "members" | "templates";
 
 function Shell() {
   const { session, email, isAdmin, loading, signOut } = useAuth();
-  const [tab, setTab] = useState<Tab>("calendar");
+  const [tab, setTab] = useState<Tab>("dashboard");
+  const [calendarDayId, setCalendarDayId] = useState<string | null>(null);
+
+  const openDay = (id: string) => {
+    setCalendarDayId(id);
+    setTab("calendar");
+  };
+  const go = (t: Tab) => {
+    setCalendarDayId(null);
+    setTab(t);
+  };
 
   if (loading) return <p style={{ padding: 24, fontFamily: "system-ui" }}>Loading...</p>;
   if (!session) return <Login />;
@@ -37,23 +49,31 @@ function Shell() {
         </div>
       </header>
 
-      <nav style={{ display: "flex", gap: 8, margin: "16px 0" }}>
-        <button onClick={() => setTab("calendar")} disabled={tab === "calendar"}>
+      <nav style={{ display: "flex", gap: 8, margin: "16px 0", flexWrap: "wrap" }}>
+        <button onClick={() => go("dashboard")} disabled={tab === "dashboard"}>
+          Dashboard
+        </button>
+        <button onClick={() => go("calendar")} disabled={tab === "calendar"}>
           Calendar
+        </button>
+        <button onClick={() => go("deadlines")} disabled={tab === "deadlines"}>
+          Deadlines
         </button>
         {isAdmin && (
           <>
-            <button onClick={() => setTab("members")} disabled={tab === "members"}>
+            <button onClick={() => go("members")} disabled={tab === "members"}>
               Members
             </button>
-            <button onClick={() => setTab("templates")} disabled={tab === "templates"}>
+            <button onClick={() => go("templates")} disabled={tab === "templates"}>
               Requirements
             </button>
           </>
         )}
       </nav>
 
-      {tab === "calendar" && <CalendarView />}
+      {tab === "dashboard" && <Dashboard onOpenDay={openDay} onGoToDeadlines={() => go("deadlines")} />}
+      {tab === "calendar" && <CalendarView initialOpenDayId={calendarDayId} />}
+      {tab === "deadlines" && <DeadlinesView />}
       {tab === "members" && isAdmin && <MembersAdmin />}
       {tab === "templates" && isAdmin && <TemplatesAdmin />}
     </main>
