@@ -44,9 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
       return;
     }
+    // Only trust a successful response. A transient failure (e.g. a token mid
+    // refresh) must NOT demote an admin to member; keep the prior value.
     api<{ email: string; isAdmin: boolean }>("/api/me")
       .then((me) => setIsAdmin(me.isAdmin))
-      .catch(() => setIsAdmin(false));
+      .catch(() => {});
   }, [session]);
 
   const signOut = async () => {

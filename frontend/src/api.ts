@@ -1,15 +1,31 @@
 import { supabase } from "./supabase";
 
-// Fetch wrapper that attaches the current Supabase access token as a bearer.
+// Return a valid access token, refreshing it if it has expired or is about to.
+// Without this, an expired token (Supabase tokens last ~1 hour) produces spurious
+// 401s that would otherwise demote an admin to a member or appear as a logout.
+async function getFreshToken(): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session) return null;
+  const expiresAtMs = (session.expires_at ?? 0) * 1000;
+  if (expiresAtMs - Date.now() < 60_000) {
+    const refreshed = await supabase.auth.refreshSession();
+    return refreshed.data.session?.access_token ?? null;
+  }
+  return session.access_token;
+}
+
+// Fetch wrapper that attaches a fresh Supabase access token as a bearer.
 export async function api<T = unknown>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const session = (await supabase?.auth.getSession())?.data.session;
+  const token = await getFreshToken();
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
-  if (session?.access_token) {
-    headers.set("Authorization", `Bearer ${session.access_token}`);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
   const res = await fetch(path, { ...init, headers });
   if (!res.ok) {
@@ -22,10 +38,10 @@ export async function api<T = unknown>(
 // POST multipart form data (e.g. media upload) with the bearer token attached.
 // Does NOT set Content-Type, so the browser adds the multipart boundary.
 export async function apiForm<T = unknown>(path: string, form: FormData): Promise<T> {
-  const session = (await supabase?.auth.getSession())?.data.session;
+  const token = await getFreshToken();
   const headers = new Headers();
-  if (session?.access_token) {
-    headers.set("Authorization", `Bearer ${session.access_token}`);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
   const res = await fetch(path, { method: "POST", headers, body: form });
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
@@ -35,10 +51,10 @@ export async function apiForm<T = unknown>(path: string, form: FormData): Promis
 // Fetch an authed binary endpoint and return an object URL (for <img>/links).
 // Caller should URL.revokeObjectURL when done.
 export async function apiBlobUrl(path: string): Promise<string> {
-  const session = (await supabase?.auth.getSession())?.data.session;
+  const token = await getFreshToken();
   const headers = new Headers();
-  if (session?.access_token) {
-    headers.set("Authorization", `Bearer ${session.access_token}`);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
   const res = await fetch(path, { headers });
   if (!res.ok) throw new Error(`${res.status}`);
