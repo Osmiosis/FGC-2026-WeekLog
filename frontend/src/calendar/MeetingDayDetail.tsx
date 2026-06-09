@@ -3,7 +3,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { useMeetingDay } from "../lib/hooks/useMeetingDay";
 import { useMediaUrl } from "../lib/hooks/useMediaUrl";
 import { SUBSYSTEMS } from "../lib/hooks/useBrowse";
-import type { Requirement, AttendanceRow, Submission, MediaRow } from "../lib/hooks/types";
+import type { Requirement, AvailableRequirement, AttendanceRow, Submission, MediaRow } from "../lib/hooks/types";
 import { Icon } from "../ui/Icon";
 import { RagTag, DividerNum, fmtDate } from "../ui/primitives";
 
@@ -20,7 +20,7 @@ function kindForLabel(label: string): string {
 export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () => void }) {
   const { isAdmin } = useAuth();
   const day = useMeetingDay(dayId);
-  const { detail, attendance, submissions, media, error, setPresent, addSubmission, uploadMedia, downloadZip } = day;
+  const { detail, attendance, submissions, media, error, setPresent, addSubmission, uploadMedia, toggleCompulsory, removeRequirement, addRequirement, loadAvailable, downloadZip } = day;
 
   const unmark = async () => {
     if (!confirm("Unmark this day? Its checklist and entries are removed.")) return;
@@ -68,12 +68,16 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
 
       <div className="stagger" style={{ display: "grid", gap: 12 }}>
         {detail.requirements.map((r) => (
-          <ReqCard key={r.id} req={r} attendance={attendance}
+          <ReqCard key={r.id} req={r} isAdmin={isAdmin} attendance={attendance}
             onSetPresent={setPresent}
             onAddText={(content, subsystem) => addSubmission({ kind: kindForLabel(r.label), content, requirementId: r.id, subsystem })}
-            onUpload={(file, kind, caption) => uploadMedia({ file, kind, caption, requirementId: r.id })} />
+            onUpload={(file, kind, caption) => uploadMedia({ file, kind, caption, requirementId: r.id })}
+            onToggleCompulsory={() => toggleCompulsory(r.id, r.compulsory ? 0 : 1)}
+            onRemove={() => { if (confirm(`Remove "${r.label}" from this meeting? Uploaded files are kept.`)) removeRequirement(r.id); }} />
         ))}
       </div>
+
+      {isAdmin && <AddRequirement onAdd={addRequirement} loadAvailable={loadAvailable} />}
 
       <Existing subs={submissions} mediaRows={media} />
     </div>
@@ -81,7 +85,7 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
 }
 
 function ReqCard({
-  req, attendance, onSetPresent, onAddText, onUpload,
+  req, isAdmin, attendance, onSetPresent, onAddText, onUpload, onToggleCompulsory, onRemove,
 }: {
   req: Requirement;
   isAdmin: boolean;
@@ -98,9 +102,15 @@ function ReqCard({
     <div className="card" style={{ borderLeft: `4px solid ${c}`, padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 15.5 }}>{req.label} {!req.compulsory && <span className="mono-label" style={{ fontSize: 9 }}>· optional</span>}</div>
+          <div style={{ fontWeight: 600, fontSize: 15.5 }}>{req.label} {!req.compulsory && <span className="mono-label" style={{ fontSize: 9 }}>· optional</span>}{req.custom ? <span className="mono-label" style={{ fontSize: 9 }}> · custom</span> : null}</div>
         </div>
         {submitted ? <RagTag status="green">Submitted</RagTag> : <RagTag status={req.compulsory ? "red" : "amber"}>Missing</RagTag>}
+        {isAdmin && (
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="btn btn-sm" onClick={onToggleCompulsory} title="Toggle compulsory for this meeting">Make {req.compulsory ? "voluntary" : "compulsory"}</button>
+            <button className="btn btn-sm" style={{ color: "var(--bad)" }} onClick={onRemove} title="Remove from this meeting">Remove</button>
+          </div>
+        )}
       </div>
 
       {req.expected_kind === "attendance" && (
@@ -213,32 +223,52 @@ function AddRequirement({
   const submitCustom = async () => {
     if (!label.trim()) return;
     setBusy(true);
-    try { await onUpload(file, kind, caption); setFile(null); setCaption(""); } finally { setBusy(false); }
+    try {
+      await onAdd({ label: label.trim(), compulsory: compulsory ? 1 : 0, expectedKind: kind });
+      setLabel("");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!open) {
     return (
-      <button onClick={openPanel} style={{ marginTop: 12 }}>
-        + Add requirement
-      </button>
+      <button className="btn btn-sm" onClick={openPanel} style={{ marginTop: 12 }}>+ Add requirement</button>
     );
   }
 
   return (
-    <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-      <label className="thumb striped" style={{ height: 84, border: "1px dashed var(--line-2)", cursor: "pointer", background: "transparent", display: "flex" }}>
-        <input type="file" style={{ display: "none" }} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        <span className="ph" style={{ flexDirection: "column", gap: 6, height: "100%", width: "100%" }}>
-          <Icon name="download" size={20} style={{ transform: "rotate(180deg)" }} />
-          <span className="mono-label" style={{ fontSize: 10 }}>{file ? file.name : "Tap to choose a photo or file"}</span>
-        </span>
-      </label>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <input className="input" style={{ flex: 2, minWidth: 140 }} placeholder="Caption" value={caption} onChange={(e) => setCaption(e.target.value)} />
-        <select className="select" style={{ flex: 1, minWidth: 110 }} value={kind} onChange={(e) => setKind(e.target.value)}>
-          {["photo", "sketch", "doc", "video"].map((k) => <option key={k} value={k}>{k}</option>)}
-        </select>
-        <button className="btn btn-primary" disabled={!file || busy} onClick={submit}>{busy ? "Uploading..." : "Upload"}</button>
+    <div className="card" style={{ marginTop: 14, padding: 16, display: "grid", gap: 14, border: "1px dashed var(--line-2)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontWeight: 600 }}>Add requirement</div>
+        <button className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Close</button>
+      </div>
+
+      <div style={{ display: "grid", gap: 6 }}>
+        <div className="mono-label" style={{ fontSize: 10 }}>From the default templates</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select className="select" style={{ flex: 1, minWidth: 160 }} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            <option value="">{available.length ? "Choose a template..." : "(none available)"}</option>
+            {available.map((t) => (
+              <option key={t.id} value={t.id}>{t.label}{t.compulsory ? "" : " (optional)"}</option>
+            ))}
+          </select>
+          <button className="btn btn-primary" onClick={submitTemplate} disabled={!templateId || busy}>Add default</button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 6 }}>
+        <div className="mono-label" style={{ fontSize: 10 }}>Or a custom one-off</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input className="input" style={{ flex: 2, minWidth: 180 }} placeholder="Requirement label" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <select className="select" style={{ minWidth: 110 }} value={kind} onChange={(e) => setKind(e.target.value)}>
+            {REQ_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+          <label className="mono-label" style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+            <input type="checkbox" checked={compulsory} onChange={(e) => setCompulsory(e.target.checked)} /> compulsory
+          </label>
+          <button className="btn btn-primary" onClick={submitCustom} disabled={!label.trim() || busy}>Add custom</button>
+        </div>
       </div>
     </div>
   );
