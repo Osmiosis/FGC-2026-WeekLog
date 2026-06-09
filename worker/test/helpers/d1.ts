@@ -45,15 +45,37 @@ export function makeTestDb(): D1Shim {
   const db = new Database(":memory:");
   db.exec(sqlFile("../../migrations/0001_init.sql"));
   db.exec(sqlFile("../../migrations/0002_seed.sql"));
+  db.exec(sqlFile("../../migrations/0003_media_content_type.sql"));
   db.exec(sqlFile("../../seed/roster.sql"));
   return new D1Shim(db);
+}
+
+// Minimal in-memory stand-in for an R2 bucket binding (put/get/delete).
+export function makeR2Stub() {
+  const store = new Map<string, Uint8Array>();
+  return {
+    async put(key: string, value: ArrayBuffer | Uint8Array) {
+      const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+      store.set(key, bytes);
+      return { key };
+    },
+    async get(key: string) {
+      const v = store.get(key);
+      if (!v) return null;
+      return { body: v, arrayBuffer: async () => v.buffer };
+    },
+    async delete(key: string) {
+      store.delete(key);
+    },
+    _store: store,
+  };
 }
 
 // Test Env factory. fetch is stubbed per-test to resolve the bearer token.
 export function testEnv(db: D1Shim): Record<string, unknown> {
   return {
     DB: db,
-    MEDIA: {},
+    MEDIA: makeR2Stub(),
     SUPABASE_URL: "https://test.supabase.co",
     SUPABASE_ANON_KEY: "test-anon",
     ADMIN_EMAIL: "vibha.aarav@gmail.com",

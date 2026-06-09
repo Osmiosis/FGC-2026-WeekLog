@@ -82,6 +82,7 @@ export interface Media {
   r2_key: string;
   caption: string | null;
   kind: MediaKind | null;
+  content_type: string | null;
   uploaded_at: string | null;
   uploaded_by: string | null;
 }
