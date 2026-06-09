@@ -64,6 +64,7 @@ export interface Submission {
   content: string | null;
   created_by: string | null;
   created_at: string | null;
+  resolved: number;
 }
 
 export interface Attendance {

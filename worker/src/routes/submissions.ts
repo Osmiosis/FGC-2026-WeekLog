@@ -22,3 +22,16 @@ submissions.delete("/:id", requireUser, async (c) => {
   await recomputeDayCache(c.env, row.meeting_day_id);
   return c.json({ ok: true });
 });
+
+// Resolve / unresolve a submission (used by the Open Build Needs view).
+submissions.post("/:id/resolve", requireUser, async (c) => {
+  const id = c.req.param("id");
+  await c.env.DB.prepare("UPDATE submissions SET resolved=1 WHERE id=?").bind(id).run();
+  return c.json({ ok: true, resolved: 1 });
+});
+
+submissions.post("/:id/unresolve", requireUser, async (c) => {
+  const id = c.req.param("id");
+  await c.env.DB.prepare("UPDATE submissions SET resolved=0 WHERE id=?").bind(id).run();
+  return c.json({ ok: true, resolved: 0 });
+});

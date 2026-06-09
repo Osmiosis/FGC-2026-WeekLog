@@ -8,6 +8,7 @@ import { submissions } from "./routes/submissions";
 import { media } from "./routes/media";
 import { deadlines } from "./routes/deadlines";
 import { dashboard } from "./routes/dashboard";
+import { search, buildNeeds } from "./routes/search";
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -26,6 +27,8 @@ app.route("/api/submissions", submissions);
 app.route("/api/media", media);
 app.route("/api/deadlines", deadlines);
 app.route("/api/dashboard", dashboard);
+app.route("/api/search", search);
+app.route("/api/build-needs", buildNeeds);
 
 export default app;
 export type { Env } from "./bindings";

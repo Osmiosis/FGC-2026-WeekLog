@@ -46,6 +46,7 @@ export function makeTestDb(): D1Shim {
   db.exec(sqlFile("../../migrations/0001_init.sql"));
   db.exec(sqlFile("../../migrations/0002_seed.sql"));
   db.exec(sqlFile("../../migrations/0003_media_content_type.sql"));
+  db.exec(sqlFile("../../migrations/0004_submission_resolved.sql"));
   db.exec(sqlFile("../../seed/roster.sql"));
   return new D1Shim(db);
 }
