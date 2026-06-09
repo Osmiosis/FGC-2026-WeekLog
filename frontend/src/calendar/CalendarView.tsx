@@ -3,11 +3,20 @@ import { api } from "../api";
 import { useAuth } from "../auth/AuthProvider";
 import { MeetingDayDetail } from "./MeetingDayDetail";
 
+type Rag = "green" | "amber" | "red";
+
 interface MeetingDay {
   id: string;
   date: string;
   title: string | null;
+  status: Rag;
 }
+
+const RAG: Record<Rag, { bg: string; border: string; label: string }> = {
+  green: { bg: "#e7f6e9", border: "#2f9e44", label: "complete" },
+  amber: { bg: "#fff4e0", border: "#e8a317", label: "in progress" },
+  red: { bg: "#fdeaea", border: "#d6336c", label: "missing" },
+};
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -130,6 +139,24 @@ export function CalendarView() {
           ? "Tap an empty day to mark it as a meeting day. Tap a meeting day to open its checklist."
           : "Tap a meeting day to open its checklist."}
       </p>
+      <div style={{ display: "flex", gap: 16, fontSize: 12, marginBottom: 8 }}>
+        {(["green", "amber", "red"] as Rag[]).map((r) => (
+          <span key={r}>
+            <span
+              style={{
+                display: "inline-block",
+                width: 12,
+                height: 12,
+                background: RAG[r].bg,
+                outline: `2px solid ${RAG[r].border}`,
+                marginRight: 4,
+                verticalAlign: "middle",
+              }}
+            />
+            {RAG[r].label}
+          </span>
+        ))}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
         {WEEKDAYS.map((w) => (
@@ -140,21 +167,24 @@ export function CalendarView() {
         {cells.map((d, i) => {
           if (d === null) return <div key={`b${i}`} style={{ ...cell, background: "#fafafa" }} />;
           const date = ymd(year, month, d);
-          const isMeeting = marked.has(date);
+          const meeting = marked.get(date);
+          const rag = meeting ? RAG[meeting.status] : null;
           return (
             <div
               key={date}
               onClick={() => clickDay(date)}
               style={{
                 ...cell,
-                cursor: isMeeting || isAdmin ? "pointer" : "default",
-                background: isMeeting ? "#e6f0ff" : "white",
-                outline: isMeeting ? "2px solid #2b6cb0" : "none",
+                cursor: meeting || isAdmin ? "pointer" : "default",
+                background: rag ? rag.bg : "white",
+                outline: rag ? `2px solid ${rag.border}` : "none",
               }}
             >
               <div>{d}</div>
-              {isMeeting && (
-                <div style={{ fontSize: 11, color: "#2b6cb0", textAlign: "left" }}>meeting</div>
+              {meeting && rag && (
+                <div style={{ fontSize: 11, color: rag.border, textAlign: "left" }}>
+                  {rag.label}
+                </div>
               )}
             </div>
           );
