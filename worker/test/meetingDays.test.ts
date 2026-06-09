@@ -91,6 +91,39 @@ describe("meeting days + snapshot", () => {
     expect(detail.status).toBe(404);
   });
 
+  it("unmarks a day that has attendance, submissions, and media", async () => {
+    const res = await mark(env, "2026-07-07");
+    const { id } = (await res.json()) as { id: string };
+
+    await app.request(
+      `/api/meeting-days/${id}/attendance`,
+      { method: "POST", headers: ADMIN, body: JSON.stringify({ member_id: "m-01", present: 1 }) },
+      env as never
+    );
+    await app.request(
+      `/api/meeting-days/${id}/submissions`,
+      { method: "POST", headers: ADMIN, body: JSON.stringify({ kind: "note", content: "x" }) },
+      env as never
+    );
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array([1, 2])], "a.png", { type: "image/png" }));
+    await app.request(
+      `/api/meeting-days/${id}/media`,
+      { method: "POST", headers: ADMIN, body: form },
+      env as never
+    );
+
+    const del = await app.request(
+      `/api/meeting-days/${id}`,
+      { method: "DELETE", headers: ADMIN },
+      env as never
+    );
+    expect(del.status).toBe(200);
+
+    const detail = await app.request(`/api/meeting-days/${id}`, { headers: ADMIN }, env as never);
+    expect(detail.status).toBe(404);
+  });
+
   it("bulk-marks every Tuesday and Thursday in July 2026", async () => {
     // July 2026: Tuesdays 7,14,21,28; Thursdays 2,9,16,23,30 -> 9 days.
     const res = await app.request(

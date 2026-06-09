@@ -43,6 +43,8 @@ export class D1Shim {
 // A fresh in-memory DB with schema + seed + roster applied, wrapped as a D1Shim.
 export function makeTestDb(): D1Shim {
   const db = new Database(":memory:");
+  // Cloudflare D1 enforces foreign keys; match that so tests catch FK violations.
+  db.pragma("foreign_keys = ON");
   db.exec(sqlFile("../../migrations/0001_init.sql"));
   db.exec(sqlFile("../../migrations/0002_seed.sql"));
   db.exec(sqlFile("../../migrations/0003_media_content_type.sql"));

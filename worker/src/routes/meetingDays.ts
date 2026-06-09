@@ -262,12 +262,23 @@ meetingDays.post("/", requireAdmin, async (c) => {
   return c.json({ ...(day as object), requirementCount: count }, 201);
 });
 
-// Unmark a meeting day: remove its requirement snapshot, then the day.
+// Unmark a meeting day: remove all of its content (media in R2 + rows), then the
+// day itself. Children must go before the day to satisfy foreign keys, and media
+// and submissions must go before meeting_requirements (they reference it).
 meetingDays.delete("/:id", requireAdmin, async (c) => {
   const id = c.req.param("id");
-  await c.env.DB.prepare("DELETE FROM meeting_requirements WHERE meeting_day_id=?")
+
+  const med = await c.env.DB.prepare("SELECT r2_key FROM media WHERE meeting_day_id=?")
     .bind(id)
-    .run();
+    .all<{ r2_key: string }>();
+  for (const m of med.results) {
+    await c.env.MEDIA.delete(m.r2_key);
+  }
+
+  await c.env.DB.prepare("DELETE FROM media WHERE meeting_day_id=?").bind(id).run();
+  await c.env.DB.prepare("DELETE FROM submissions WHERE meeting_day_id=?").bind(id).run();
+  await c.env.DB.prepare("DELETE FROM attendance WHERE meeting_day_id=?").bind(id).run();
+  await c.env.DB.prepare("DELETE FROM meeting_requirements WHERE meeting_day_id=?").bind(id).run();
   await c.env.DB.prepare("DELETE FROM meeting_days WHERE id=?").bind(id).run();
   return c.json({ ok: true });
 });
