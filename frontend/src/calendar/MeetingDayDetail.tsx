@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, apiForm, apiBlobUrl } from "../api";
+import { api, apiForm, apiBlobUrl, downloadAuthed } from "../api";
 import { useAuth } from "../auth/AuthProvider";
 
 interface Requirement {
@@ -119,11 +119,16 @@ export function MeetingDayDetail({
           Meeting day {detail.date}
           {detail.title ? ` (${detail.title})` : ""}
         </h2>
-        {isAdmin && (
-          <button onClick={unmark} style={{ color: "crimson" }}>
-            Unmark this day
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => downloadAuthed(`/api/meeting-days/${dayId}/zip`, `meeting-${detail.date}.zip`)}>
+            Download day (ZIP)
           </button>
-        )}
+          {isAdmin && (
+            <button onClick={unmark} style={{ color: "crimson" }}>
+              Unmark this day
+            </button>
+          )}
+        </div>
       </div>
 
       {detail.missingCompulsory.length > 0 ? (

@@ -44,3 +44,15 @@ export async function apiBlobUrl(path: string): Promise<string> {
   if (!res.ok) throw new Error(`${res.status}`);
   return URL.createObjectURL(await res.blob());
 }
+
+// Fetch an authed endpoint and trigger a browser download (e.g. a ZIP).
+export async function downloadAuthed(path: string, filename: string): Promise<void> {
+  const url = await apiBlobUrl(path);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}

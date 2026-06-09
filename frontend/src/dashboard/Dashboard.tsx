@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, downloadAuthed } from "../api";
 
 type Rag = "green" | "amber" | "red";
 
@@ -141,6 +141,32 @@ export function Dashboard({
           ))}
         </ul>
       )}
+
+      <ExportAndBackup />
     </section>
+  );
+}
+
+function ExportAndBackup() {
+  const [driveConfigured, setDriveConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    api<{ configured: boolean }>("/api/drive/status")
+      .then((s) => setDriveConfigured(s.configured))
+      .catch(() => setDriveConfigured(false));
+  }, []);
+
+  return (
+    <div style={{ marginTop: 28, paddingTop: 16, borderTop: "1px solid #eee" }}>
+      <h3>Export and backup</h3>
+      <button onClick={() => downloadAuthed("/api/export/all-media/zip", "all-media.zip")}>
+        Download all media (ZIP)
+      </button>
+      <p style={{ fontSize: 13, color: "#555", marginTop: 8 }}>
+        {driveConfigured
+          ? "Drive sync is configured."
+          : "Drive sync is not configured. Download a ZIP and upload it to the mentors' Drive manually."}
+      </p>
+    </div>
   );
 }
