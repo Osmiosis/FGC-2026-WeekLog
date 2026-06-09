@@ -15,6 +15,7 @@ export interface ReqRow {
   compulsory: number;
   expected_kind: string | null;
   status: string;
+  custom: number;
 }
 interface SubRow {
   requirement_id: string | null;

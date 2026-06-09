@@ -11,7 +11,7 @@ interface Derived {
 
 export async function deriveDay(env: Env, dayId: string): Promise<Derived> {
   const reqs = await env.DB.prepare(
-    "SELECT id, label, compulsory, expected_kind, status FROM meeting_requirements WHERE meeting_day_id=? ORDER BY compulsory DESC, label"
+    "SELECT id, label, compulsory, expected_kind, status, custom FROM meeting_requirements WHERE meeting_day_id=? AND active=1 ORDER BY compulsory DESC, label"
   )
     .bind(dayId)
     .all<ReqRow>();
