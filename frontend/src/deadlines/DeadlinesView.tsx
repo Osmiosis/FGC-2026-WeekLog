@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { useDeadlines, useDeadlineProof, DEADLINE_CATEGORIES } from "../lib/hooks/useDeadlines";
 import { useMediaUrl } from "../lib/hooks/useMediaUrl";
@@ -77,18 +77,42 @@ function DeadlineCard({ d, isAdmin, onDone, onReopen, onDelete }: {
 
 function Proof({ deadlineId }: { deadlineId: string }) {
   const { rows, upload } = useDeadlineProof(deadlineId);
-  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Upload every selected file (the hook takes one at a time, so loop). You can
+  // attach as many materials as you want before marking the deadline done.
+  const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // let the same file be re-picked later
+    if (!files.length) return;
+    setErr(null);
+    for (let i = 0; i < files.length; i++) {
+      setProgress({ done: i, total: files.length });
+      try {
+        await upload(files[i]);
+      } catch {
+        setErr(`Could not upload "${files[i].name}". Files must be 10 MB or smaller.`);
+        break;
+      }
+    }
+    setProgress(null);
+  };
+
+  const busy = progress !== null;
   return (
     <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span className="mono-label" style={{ fontSize: 10 }}>Proof</span>
-        <label className="btn btn-sm" style={{ cursor: "pointer" }}>
-          <input type="file" style={{ display: "none" }} onChange={async (e) => {
-            const f = e.target.files?.[0]; if (!f) return; setBusy(true); try { await upload(f); } finally { setBusy(false); }
-          }} />
-          <Icon name="download" size={15} style={{ transform: "rotate(180deg)" }} /> {busy ? "Uploading..." : "Attach"}
+        <span className="mono-label" style={{ fontSize: 10 }}>
+          Proof{rows.length > 0 ? ` (${rows.length})` : ""}
+        </span>
+        <label className="btn btn-sm" style={{ cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
+          <input type="file" multiple disabled={busy} style={{ display: "none" }} onChange={onPick} />
+          <Icon name="download" size={15} style={{ transform: "rotate(180deg)" }} />{" "}
+          {busy ? `Uploading ${progress!.done + 1}/${progress!.total}...` : rows.length > 0 ? "Attach more" : "Attach files"}
         </label>
       </div>
+      {err && <p style={{ color: "var(--bad)", fontSize: 12, marginTop: 8 }}>{err}</p>}
       {rows.length > 0 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           {rows.map((m) => <ProofThumb key={m.id} row={m} />)}
