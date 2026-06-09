@@ -44,4 +44,50 @@ describe("per-meeting requirement editing", () => {
     expect(row?.active).toBe(1);
     expect(row?.custom).toBe(0);
   });
+
+  it("toggles a requirement compulsory <-> voluntary and updates RAG", async () => {
+    const id = await mark(env, "2026-07-07");
+    const before = await getReqs(env, id);
+    const target = before.find((r) => r.compulsory === 1 && r.expected_kind === "text");
+    expect(target).toBeTruthy();
+
+    const res = await app.request(
+      `/api/meeting-days/${id}/requirements/${target!.id}`,
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ compulsory: 0 }) },
+      env as never
+    );
+    expect(res.status).toBe(200);
+
+    const after = await getReqs(env, id);
+    expect(after.find((r) => r.id === target!.id)!.compulsory).toBe(0);
+  });
+
+  it("rejects a bad compulsory value (400) and a non-admin (403)", async () => {
+    const id = await mark(env, "2026-07-07");
+    const r = (await getReqs(env, id))[0];
+
+    const bad = await app.request(
+      `/api/meeting-days/${id}/requirements/${r.id}`,
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ compulsory: 5 }) },
+      env as never
+    );
+    expect(bad.status).toBe(400);
+
+    const forbidden = await app.request(
+      `/api/meeting-days/${id}/requirements/${r.id}`,
+      { method: "PATCH", headers: MEMBER, body: JSON.stringify({ compulsory: 0 }) },
+      env as never
+    );
+    expect(forbidden.status).toBe(403);
+  });
+
+  it("404s when the requirement does not belong to the day", async () => {
+    const id = await mark(env, "2026-07-07");
+    const res = await app.request(
+      `/api/meeting-days/${id}/requirements/does-not-exist`,
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ compulsory: 0 }) },
+      env as never
+    );
+    expect(res.status).toBe(404);
+  });
 });

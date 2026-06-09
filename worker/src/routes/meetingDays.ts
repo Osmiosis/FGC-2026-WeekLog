@@ -210,6 +210,31 @@ meetingDays.post("/:id/media", requireUser, async (c) => {
   return c.json(row, 201);
 });
 
+// ---- Per-meeting requirement editing (admin) ----
+
+const REQ_KINDS = new Set(["attendance", "text", "media", "any"]);
+
+// Toggle a single requirement compulsory <-> voluntary for this meeting only.
+meetingDays.patch("/:id/requirements/:reqId", requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const reqId = c.req.param("reqId");
+  const b = await c.req.json<{ compulsory?: number }>();
+  if (b.compulsory !== 0 && b.compulsory !== 1) {
+    return c.json({ error: "compulsory must be 0 or 1" }, 400);
+  }
+  const row = await c.env.DB.prepare(
+    "SELECT id FROM meeting_requirements WHERE id=? AND meeting_day_id=? AND active=1"
+  )
+    .bind(reqId, id)
+    .first();
+  if (!row) return c.json({ error: "not found" }, 404);
+  await c.env.DB.prepare("UPDATE meeting_requirements SET compulsory=? WHERE id=?")
+    .bind(b.compulsory, reqId)
+    .run();
+  const derived = await recomputeDayCache(c.env, id);
+  return c.json({ ok: true, requirements: derived.requirements });
+});
+
 // Bulk-mark a recurring pattern (e.g. every Tue + Thu over a date range).
 // Registered before "/:id" matters not (distinct static segment).
 meetingDays.post("/bulk", requireAdmin, async (c) => {
