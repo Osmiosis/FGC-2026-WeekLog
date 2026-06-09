@@ -10,3 +10,7 @@ dist/
 # keep example templates tracked
 !.dev.vars.example
 !.env.example
+
+# design handoff drop (kept out of the repo)
+.design-handoff/
+FGC-Log-Frontend.zip
