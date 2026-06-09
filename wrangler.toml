@@ -19,6 +19,8 @@ bucket_name = "weeklog-media"
 [vars]
 SUPABASE_URL = "https://euzvqdnonmkechsdtryr.supabase.co"
 ADMIN_EMAIL = "vibha.aarav@gmail.com"
+# Lock CORS to your deployed Pages URL once you have it (defaults to "*" if unset).
+# FRONTEND_ORIGIN = "https://weeklog.pages.dev"
 
 # SUPABASE_ANON_KEY (publishable key) is provided via .dev.vars for local dev.
 # For deploy, set it once with:  wrangler secret put SUPABASE_ANON_KEY

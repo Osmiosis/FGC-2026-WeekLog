@@ -5,6 +5,12 @@
   "scripts": {
     "test": "npm run test --workspace @weeklog/worker",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build --workspace @weeklog/frontend"
+    "build": "npm run build --workspace @weeklog/frontend",
+    "migrate:local": "wrangler d1 migrations apply weeklog --local",
+    "migrate:remote": "wrangler d1 migrations apply weeklog --remote",
+    "seed:local": "wrangler d1 execute weeklog --local --file worker/seed/roster.sql",
+    "seed:remote": "wrangler d1 execute weeklog --remote --file worker/seed/roster.sql",
+    "setup:local": "npm run migrate:local && npm run seed:local",
+    "setup:remote": "npm run migrate:remote && npm run seed:remote"
   }
 }
