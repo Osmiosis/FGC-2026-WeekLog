@@ -4,6 +4,14 @@ You are restyling the frontend of a meeting-compliance tracker for a teenage rob
 team (Team Qatar, FIRST Global Challenge 2026). The app currently works end to end. Your
 job is **visual and presentational only**. Do not change how data flows or how auth works.
 
+> The wiring has been isolated into `frontend/src/lib/**` (Supabase client, the `api()`
+> helper, and typed data hooks) plus `frontend/src/auth/AuthProvider.tsx`. Those are the
+> protected layer — do not edit them. Components get their data and actions from hooks
+> (`useDashboard()`, `useMembers()`, `useMeetingDay()`, `useAuth()`, etc.) and contain no
+> fetch/URL/token code. See `DESIGN.md` for the workflow and run `npm run verify` before
+> declaring done. The section below predates that refactor; `DESIGN.md` is authoritative on
+> which paths are protected.
+
 ## Product context (so the design serves the job)
 - The spine of the app is a CALENDAR that creates OBLIGATIONS, surfaced as a
   **red / amber / green (RAG) compliance dashboard**. RAG status is the core visual
