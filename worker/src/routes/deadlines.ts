@@ -3,6 +3,7 @@ import type { Env, Variables } from "../bindings";
 import { requireUser, requireAdmin } from "../auth";
 import { deadlineRag } from "../compliance";
 import { todayUTC } from "../dayStatus";
+import { checkStorageBudget } from "../storage";
 
 export const deadlines = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -126,14 +127,18 @@ deadlines.post("/:id/media", requireUser, async (c) => {
   const file = form["file"];
   if (!(file instanceof File)) return c.json({ error: "file required" }, 400);
   const str = (k: string) => (typeof form[k] === "string" ? (form[k] as string) : null);
+  const buf = await file.arrayBuffer();
+  const budget = await checkStorageBudget(c.env, buf.byteLength);
+  if (!budget.ok) return c.json({ error: budget.error }, budget.status);
+
   const mediaId = crypto.randomUUID();
   const key = `deadlines/${id}/${mediaId}-${file.name}`;
-  await c.env.MEDIA.put(key, await file.arrayBuffer());
+  await c.env.MEDIA.put(key, buf);
   const user = c.get("user");
   await c.env.DB.prepare(
-    "INSERT INTO media (id, meeting_day_id, deadline_id, requirement_id, subsystem, r2_key, caption, kind, content_type, uploaded_at, uploaded_by) VALUES (?, NULL, ?, NULL, NULL, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO media (id, meeting_day_id, deadline_id, requirement_id, subsystem, r2_key, caption, kind, content_type, bytes, uploaded_at, uploaded_by) VALUES (?, NULL, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)"
   )
-    .bind(mediaId, id, key, str("caption"), str("kind"), file.type || null, new Date().toISOString(), user.email)
+    .bind(mediaId, id, key, str("caption"), str("kind"), file.type || null, buf.byteLength, new Date().toISOString(), user.email)
     .run();
   const row = await c.env.DB.prepare("SELECT * FROM media WHERE id=?").bind(mediaId).first();
   return c.json(row, 201);
