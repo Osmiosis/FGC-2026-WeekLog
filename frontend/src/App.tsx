@@ -2,12 +2,15 @@ import { useState } from "react";
 import { isConfigured } from "./supabase";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { Login } from "./auth/Login";
+import { CalendarView } from "./calendar/CalendarView";
 import { MembersAdmin } from "./admin/MembersAdmin";
 import { TemplatesAdmin } from "./admin/TemplatesAdmin";
 
+type Tab = "calendar" | "members" | "templates";
+
 function Shell() {
   const { session, email, isAdmin, loading, signOut } = useAuth();
-  const [tab, setTab] = useState<"members" | "templates">("members");
+  const [tab, setTab] = useState<Tab>("calendar");
 
   if (loading) return <p style={{ padding: 24, fontFamily: "system-ui" }}>Loading...</p>;
   if (!session) return <Login />;
@@ -34,23 +37,25 @@ function Shell() {
         </div>
       </header>
 
-      {isAdmin ? (
-        <>
-          <nav style={{ display: "flex", gap: 8, margin: "16px 0" }}>
+      <nav style={{ display: "flex", gap: 8, margin: "16px 0" }}>
+        <button onClick={() => setTab("calendar")} disabled={tab === "calendar"}>
+          Calendar
+        </button>
+        {isAdmin && (
+          <>
             <button onClick={() => setTab("members")} disabled={tab === "members"}>
               Members
             </button>
             <button onClick={() => setTab("templates")} disabled={tab === "templates"}>
               Requirements
             </button>
-          </nav>
-          {tab === "members" ? <MembersAdmin /> : <TemplatesAdmin />}
-        </>
-      ) : (
-        <p style={{ marginTop: 24 }}>
-          You are signed in. The calendar and dashboard arrive in the next phases.
-        </p>
-      )}
+          </>
+        )}
+      </nav>
+
+      {tab === "calendar" && <CalendarView />}
+      {tab === "members" && isAdmin && <MembersAdmin />}
+      {tab === "templates" && isAdmin && <TemplatesAdmin />}
     </main>
   );
 }
