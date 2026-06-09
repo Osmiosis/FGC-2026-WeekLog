@@ -384,6 +384,21 @@ meetingDays.post("/", requireAdmin, async (c) => {
   return c.json({ ...(day as object), requirementCount: count }, 201);
 });
 
+// Rename a meeting day: set or clear its title. Empty/whitespace clears to NULL.
+meetingDays.patch("/:id", requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const b = await c.req.json<{ title?: string | null }>();
+  if (typeof b.title !== "string" && b.title !== null) {
+    return c.json({ error: "title must be a string or null" }, 400);
+  }
+  const title = b.title == null ? null : b.title.trim().slice(0, 120) || null;
+  const row = await c.env.DB.prepare("SELECT id FROM meeting_days WHERE id=?").bind(id).first();
+  if (!row) return c.json({ error: "not found" }, 404);
+  await c.env.DB.prepare("UPDATE meeting_days SET title=? WHERE id=?").bind(title, id).run();
+  const day = await c.env.DB.prepare("SELECT * FROM meeting_days WHERE id=?").bind(id).first();
+  return c.json({ ok: true, ...(day as object) });
+});
+
 // Unmark a meeting day: remove all of its content (media in R2 + rows), then the
 // day itself. Children must go before the day to satisfy foreign keys, and media
 // and submissions must go before meeting_requirements (they reference it).

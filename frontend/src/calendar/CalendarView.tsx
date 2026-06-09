@@ -34,7 +34,11 @@ export function CalendarView({ initialOpenDayId }: { initialOpenDayId?: string |
   const clickDay = async (date: string) => {
     const existing = marked.get(date);
     if (existing) { setOpenDayId(existing.id); return; }
-    if (isAdmin) await markDay(date);
+    if (isAdmin) {
+      const name = prompt("Meeting name (optional — leave blank for none):");
+      if (name === null) return; // cancelled
+      await markDay(date, name.trim() || undefined);
+    }
   };
 
   // Bulk recurring mark using the existing single markDay (no new hook needed).

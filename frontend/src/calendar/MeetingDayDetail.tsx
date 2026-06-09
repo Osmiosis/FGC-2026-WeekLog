@@ -20,7 +20,7 @@ function kindForLabel(label: string): string {
 export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () => void }) {
   const { isAdmin } = useAuth();
   const day = useMeetingDay(dayId);
-  const { detail, attendance, submissions, media, error, setPresent, addSubmission, uploadMedia, toggleCompulsory, removeRequirement, addRequirement, loadAvailable, downloadZip } = day;
+  const { detail, attendance, submissions, media, error, setPresent, addSubmission, uploadMedia, toggleCompulsory, removeRequirement, addRequirement, loadAvailable, rename, downloadZip } = day;
 
   const unmark = async () => {
     if (!confirm("Unmark this day? Its checklist and entries are removed.")) return;
@@ -43,7 +43,9 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
         <div style={{ flex: 1, minWidth: 200 }}>
           <p className="eyebrow"><span className="dot">/ </span>Meeting day</p>
           <h2 className="display" style={{ fontSize: 28, margin: "6px 0 2px", fontWeight: 700 }}>{fmtDate(detail.date, { weekday: "long", month: "long", day: "numeric" })}</h2>
-          {detail.title && <div className="mono-label">{detail.title}</div>}
+          {isAdmin
+            ? <TitleEditor title={detail.title} onSave={rename} />
+            : detail.title && <div className="mono-label">{detail.title}</div>}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn btn-sm" onClick={downloadZip}><Icon name="download" size={15} /> ZIP</button>
@@ -80,6 +82,36 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
       {isAdmin && <AddRequirement onAdd={addRequirement} loadAvailable={loadAvailable} />}
 
       <Existing subs={submissions} mediaRows={media} />
+    </div>
+  );
+}
+
+function TitleEditor({ title, onSave }: { title: string | null; onSave: (t: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(title ?? "");
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    try { await onSave(val.trim()); setEditing(false); } finally { setBusy(false); }
+  };
+
+  if (!editing) {
+    return (
+      <div className="mono-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {title || <span style={{ color: "var(--fg-faint)" }}>Untitled meeting</span>}
+        <button className="btn btn-ghost btn-sm" style={{ padding: "2px 6px" }} onClick={() => { setVal(title ?? ""); setEditing(true); }}>Rename</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+      <input className="input" style={{ minWidth: 180 }} value={val} placeholder="Meeting name" autoFocus
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} />
+      <button className="btn btn-primary btn-sm" disabled={busy} onClick={save}>Save</button>
+      <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setEditing(false)}>Cancel</button>
     </div>
   );
 }

@@ -105,6 +105,11 @@ export function useMeetingDay(dayId: string) {
     [dayId]
   );
 
+  const rename = async (title: string) => {
+    await api(`/api/meeting-days/${dayId}`, { method: "PATCH", body: JSON.stringify({ title }) });
+    reload();
+  };
+
   const unmark = async () => {
     await api(`/api/meeting-days/${dayId}`, { method: "DELETE" });
   };
@@ -126,6 +131,7 @@ export function useMeetingDay(dayId: string) {
     removeRequirement,
     addRequirement,
     loadAvailable,
+    rename,
     unmark,
     downloadZip,
   };
