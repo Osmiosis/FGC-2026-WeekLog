@@ -1,0 +1,19 @@
+name = "weeklog-worker"
+main = "worker/src/index.ts"
+compatibility_date = "2024-09-23"
+
+# D1 database. Create with: wrangler d1 create weeklog
+# then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "weeklog"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "worker/migrations"
+
+# R2 bucket for media uploads. Create with: wrangler r2 bucket create weeklog-media
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "weeklog-media"
+
+# Secrets (set with `wrangler secret put`):
+#   TEAM_PASSWORD_HASH, ADMIN_PASSWORD_HASH
