@@ -90,4 +90,48 @@ describe("per-meeting requirement editing", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  it("soft-removes a requirement: it leaves the checklist but stays in the DB", async () => {
+    const id = await mark(env, "2026-07-07");
+    const before = await getReqs(env, id);
+    const target = before[0];
+
+    const res = await app.request(
+      `/api/meeting-days/${id}/requirements/${target.id}`,
+      { method: "DELETE", headers: ADMIN },
+      env as never
+    );
+    expect(res.status).toBe(200);
+
+    // Gone from the checklist...
+    const after = await getReqs(env, id);
+    expect(after.find((r) => r.id === target.id)).toBeUndefined();
+    expect(after.length).toBe(before.length - 1);
+
+    // ...but the row is still in the DB with active=0 (data preserved).
+    const row = await db
+      .prepare("SELECT active FROM meeting_requirements WHERE id=?")
+      .bind(target.id)
+      .first<{ active: number }>();
+    expect(row?.active).toBe(0);
+  });
+
+  it("rejects soft-remove by a non-admin (403) and 404s an unknown requirement", async () => {
+    const id = await mark(env, "2026-07-07");
+    const r = (await getReqs(env, id))[0];
+
+    const forbidden = await app.request(
+      `/api/meeting-days/${id}/requirements/${r.id}`,
+      { method: "DELETE", headers: MEMBER },
+      env as never
+    );
+    expect(forbidden.status).toBe(403);
+
+    const missing = await app.request(
+      `/api/meeting-days/${id}/requirements/nope`,
+      { method: "DELETE", headers: ADMIN },
+      env as never
+    );
+    expect(missing.status).toBe(404);
+  });
 });

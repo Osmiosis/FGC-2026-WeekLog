@@ -235,6 +235,24 @@ meetingDays.patch("/:id/requirements/:reqId", requireAdmin, async (c) => {
   return c.json({ ok: true, requirements: derived.requirements });
 });
 
+// Soft-remove a requirement from this meeting. Keeps any linked media/submissions
+// in the database; the requirement simply leaves the checklist and RAG count.
+meetingDays.delete("/:id/requirements/:reqId", requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const reqId = c.req.param("reqId");
+  const row = await c.env.DB.prepare(
+    "SELECT id FROM meeting_requirements WHERE id=? AND meeting_day_id=? AND active=1"
+  )
+    .bind(reqId, id)
+    .first();
+  if (!row) return c.json({ error: "not found" }, 404);
+  await c.env.DB.prepare("UPDATE meeting_requirements SET active=0 WHERE id=?")
+    .bind(reqId)
+    .run();
+  const derived = await recomputeDayCache(c.env, id);
+  return c.json({ ok: true, requirements: derived.requirements });
+});
+
 // Bulk-mark a recurring pattern (e.g. every Tue + Thu over a date range).
 // Registered before "/:id" matters not (distinct static segment).
 meetingDays.post("/bulk", requireAdmin, async (c) => {
