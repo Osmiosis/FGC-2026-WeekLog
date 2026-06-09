@@ -15,5 +15,11 @@ migrations_dir = "worker/migrations"
 binding = "MEDIA"
 bucket_name = "weeklog-media"
 
-# Secrets (set with `wrangler secret put`):
-#   TEAM_PASSWORD_HASH, ADMIN_PASSWORD_HASH
+# Public, non-secret config (safe to commit).
+[vars]
+SUPABASE_URL = "https://euzvqdnonmkechsdtryr.supabase.co"
+ADMIN_EMAIL = "vibha.aarav@gmail.com"
+
+# SUPABASE_ANON_KEY (publishable key) is provided via .dev.vars for local dev.
+# For deploy, set it once with:  wrangler secret put SUPABASE_ANON_KEY
+# (It is a public key, but secret put keeps it out of the committed config.)

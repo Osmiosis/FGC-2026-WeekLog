@@ -12,13 +12,35 @@ D1 (database), R2 (media).
 - A free Cloudflare account
 - Node.js 20+ and npm
 
+## Auth (Supabase magic link)
+
+Login is passwordless: a member enters their email and clicks a sign in link.
+Anyone with a valid email can sign in as a member. One account is the admin
+(set by `ADMIN_EMAIL`, default `vibha.aarav@gmail.com`); the admin manages the
+roster and requirement templates.
+
+### Supabase setup (one time)
+
+1. Create a free project at supabase.com (or reuse an existing one).
+2. Project Settings > API: copy the **Project URL** and the **anon / publishable** key.
+3. Put them where the app reads them:
+   - `frontend/.env` (see `frontend/.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+   - `.dev.vars` (see `.dev.vars.example`): `SUPABASE_ANON_KEY` (for local `wrangler dev`)
+   - `wrangler.toml` `[vars]`: `SUPABASE_URL`, `ADMIN_EMAIL`
+4. Authentication > URL Configuration: add `http://localhost:5173` (and later your
+   Pages URL) to the redirect allowlist, or the magic link will not return to the app.
+
+Note: Supabase's built-in mailer rate-limits magic links (roughly 3 to 4 per hour)
+and sends from a Supabase address. Fine for trickle signups. To onboard the whole
+team at once, configure custom SMTP in the Supabase dashboard.
+
 ## Local development
 
 ```bash
 npm install
-# Terminal 1: API
+# Terminal 1: API (reads SUPABASE_ANON_KEY from .dev.vars, vars from wrangler.toml)
 npx wrangler dev
-# Terminal 2: frontend (proxies /api to the worker)
+# Terminal 2: frontend (proxies /api to the worker, reads frontend/.env)
 npm run dev --workspace @weeklog/frontend
 ```
 
@@ -37,9 +59,8 @@ npx wrangler r2 bucket create weeklog-media
 npx wrangler d1 migrations apply weeklog --remote
 npx wrangler d1 execute weeklog --remote --file worker/seed/roster.sql
 
-# 4. Set auth secrets (store only hashes; see auth phase for hashing)
-npx wrangler secret put TEAM_PASSWORD_HASH
-npx wrangler secret put ADMIN_PASSWORD_HASH
+# 4. Provide the Supabase publishable key to the deployed worker
+npx wrangler secret put SUPABASE_ANON_KEY
 
 # 5. Deploy the worker
 npx wrangler deploy
