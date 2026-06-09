@@ -33,6 +33,14 @@ export interface Requirement {
   compulsory: number;
   expected_kind: string | null;
   status: "submitted" | "missing";
+  custom: number;
+}
+
+export interface AvailableRequirement {
+  id: string;
+  label: string;
+  compulsory: number;
+  expected_kind: string | null;
 }
 
 export interface MeetingDayDetail {

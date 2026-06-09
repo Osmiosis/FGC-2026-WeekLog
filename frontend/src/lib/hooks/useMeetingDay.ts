@@ -1,7 +1,7 @@
 // PROTECTED WIRING — do not edit during design work. Owns a meeting day's content.
 import { useCallback, useEffect, useState } from "react";
 import { api, apiForm, downloadAuthed } from "../api";
-import type { MeetingDayDetail, AttendanceRow, Submission, MediaRow } from "./types";
+import type { MeetingDayDetail, AttendanceRow, Submission, MediaRow, AvailableRequirement } from "./types";
 
 export function useMeetingDay(dayId: string) {
   const [detail, setDetail] = useState<MeetingDayDetail | null>(null);
@@ -74,6 +74,37 @@ export function useMeetingDay(dayId: string) {
     reload();
   };
 
+  const toggleCompulsory = async (reqId: string, compulsory: number) => {
+    await api(`/api/meeting-days/${dayId}/requirements/${reqId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ compulsory }),
+    });
+    reload();
+  };
+
+  const removeRequirement = async (reqId: string) => {
+    await api(`/api/meeting-days/${dayId}/requirements/${reqId}`, { method: "DELETE" });
+    reload();
+  };
+
+  const addRequirement = async (
+    input:
+      | { templateId: string }
+      | { label: string; compulsory: number; expectedKind: string }
+  ) => {
+    await api(`/api/meeting-days/${dayId}/requirements`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    reload();
+  };
+
+  const loadAvailable = useCallback(
+    (): Promise<AvailableRequirement[]> =>
+      api<AvailableRequirement[]>(`/api/meeting-days/${dayId}/requirements/available`),
+    [dayId]
+  );
+
   const unmark = async () => {
     await api(`/api/meeting-days/${dayId}`, { method: "DELETE" });
   };
@@ -91,6 +122,10 @@ export function useMeetingDay(dayId: string) {
     setPresent,
     addSubmission,
     uploadMedia,
+    toggleCompulsory,
+    removeRequirement,
+    addRequirement,
+    loadAvailable,
     unmark,
     downloadZip,
   };
