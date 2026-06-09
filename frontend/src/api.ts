@@ -1,5 +1,9 @@
 import { supabase } from "./supabase";
 
+// In dev this is empty and the Vite proxy forwards /api to the local Worker.
+// In production set VITE_API_BASE to the deployed Worker URL (e.g. the workers.dev URL).
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+
 // Return a valid access token, refreshing it if it has expired or is about to.
 // Without this, an expired token (Supabase tokens last ~1 hour) produces spurious
 // 401s that would otherwise demote an admin to a member or appear as a logout.
@@ -27,7 +31,7 @@ export async function api<T = unknown>(
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status}: ${text}`);
@@ -43,7 +47,7 @@ export async function apiForm<T = unknown>(path: string, form: FormData): Promis
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const res = await fetch(path, { method: "POST", headers, body: form });
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: form });
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
   return (await res.json()) as T;
 }
@@ -56,7 +60,7 @@ export async function apiBlobUrl(path: string): Promise<string> {
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const res = await fetch(path, { headers });
+  const res = await fetch(`${API_BASE}${path}`, { headers });
   if (!res.ok) throw new Error(`${res.status}`);
   return URL.createObjectURL(await res.blob());
 }

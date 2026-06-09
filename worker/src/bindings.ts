@@ -8,6 +8,8 @@ export interface Env {
   // Optional Drive connector config (v1 ships the NullDriveConnector). See drive.ts.
   DRIVE_ENABLED?: string;
   DRIVE_FOLDER_ID?: string;
+  // Allowed browser origin for CORS (the deployed Pages URL). Defaults to "*".
+  FRONTEND_ORIGIN?: string;
 }
 
 export interface AuthUser {

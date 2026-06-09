@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { Env, Variables } from "./bindings";
 import { requireUser, isAdmin } from "./auth";
 import { members } from "./routes/members";
@@ -13,6 +14,18 @@ import { exports } from "./routes/exports";
 import { driveRoutes } from "./routes/drive";
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+// The frontend (Cloudflare Pages) is a different origin from the Worker, so allow
+// it via CORS. We authenticate with bearer tokens (not cookies), so a wildcard
+// default is safe; set FRONTEND_ORIGIN to lock it to the deployed Pages URL.
+app.use(
+  "/api/*",
+  cors({
+    origin: (_origin, c) => c.env?.FRONTEND_ORIGIN ?? "*",
+    allowHeaders: ["Authorization", "Content-Type"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  })
+);
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "weeklog-worker" }));
 
