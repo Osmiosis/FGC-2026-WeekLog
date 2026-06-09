@@ -1,15 +1,21 @@
 import { Hono } from "hono";
+import type { Env, Variables } from "./bindings";
+import { requireUser, isAdmin } from "./auth";
+import { members } from "./routes/members";
+import { templates } from "./routes/templates";
 
-// Cloudflare bindings (D1 + R2) declared now so later phases attach to the same Env.
-export interface Env {
-  DB: D1Database;
-  MEDIA: R2Bucket;
-  TEAM_PASSWORD_HASH: string;
-  ADMIN_PASSWORD_HASH: string;
-}
-
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "weeklog-worker" }));
 
+// Identity probe: who am I, and am I the admin.
+app.get("/api/me", requireUser, (c) => {
+  const user = c.get("user");
+  return c.json({ email: user.email, isAdmin: isAdmin(c.env, user) });
+});
+
+app.route("/api/members", members);
+app.route("/api/requirement-templates", templates);
+
 export default app;
+export type { Env } from "./bindings";
