@@ -5,6 +5,7 @@ import { useMediaUrl } from "../lib/hooks/useMediaUrl";
 import { SUBSYSTEMS } from "../lib/hooks/useBrowse";
 import type {
   Requirement,
+  AvailableRequirement,
   AttendanceRow,
   Submission,
   MediaRow,
@@ -22,7 +23,7 @@ function kindForLabel(label: string): string {
 export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () => void }) {
   const { isAdmin } = useAuth();
   const day = useMeetingDay(dayId);
-  const { detail, attendance, submissions, media, error, setPresent, addSubmission, uploadMedia } = day;
+  const { detail, attendance, submissions, media, error, setPresent, addSubmission, uploadMedia, toggleCompulsory, removeRequirement, addRequirement, loadAvailable } = day;
 
   const unmark = async () => {
     if (!confirm("Unmark this day? Its checklist and entries are removed.")) return;
@@ -66,6 +67,7 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
         <RequirementCard
           key={r.id}
           req={r}
+          isAdmin={isAdmin}
           attendance={attendance}
           onSetPresent={setPresent}
           onAddText={(content, subsystem) =>
@@ -74,8 +76,16 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
           onUpload={(file, kind, caption) =>
             uploadMedia({ file, kind, caption, requirementId: r.id })
           }
+          onToggleCompulsory={() => toggleCompulsory(r.id, r.compulsory ? 0 : 1)}
+          onRemove={() => {
+            if (confirm(`Remove "${r.label}" from this meeting? Uploaded files are kept.`)) {
+              removeRequirement(r.id);
+            }
+          }}
         />
       ))}
+
+      {isAdmin && <AddRequirement onAdd={addRequirement} loadAvailable={loadAvailable} />}
 
       <Existing subs={submissions} mediaRows={media} />
     </section>
@@ -84,27 +94,50 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
 
 function RequirementCard({
   req,
+  isAdmin,
   attendance,
   onSetPresent,
   onAddText,
   onUpload,
+  onToggleCompulsory,
+  onRemove,
 }: {
   req: Requirement;
+  isAdmin: boolean;
   attendance: AttendanceRow[];
   onSetPresent: (memberId: string, present: number) => void;
   onAddText: (content: string, subsystem?: string) => void;
   onUpload: (file: File, kind: string, caption: string) => void;
+  onToggleCompulsory: () => void;
+  onRemove: () => void;
 }) {
   const submitted = req.status === "submitted";
   const border = submitted ? "#b4e0b8" : req.compulsory ? "#f3b4b4" : "#ddd";
 
   return (
     <div style={{ border: `1px solid ${border}`, borderLeft: `6px solid ${border}`, padding: 12, margin: "8px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <strong>
           {req.label} {req.compulsory ? "" : "(optional)"}
+          {req.custom ? <span style={{ color: "#888", fontWeight: 400 }}> · custom</span> : ""}
         </strong>
-        <span>{submitted ? "submitted" : "missing"}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span>{submitted ? "submitted" : "missing"}</span>
+          {isAdmin && (
+            <>
+              <button
+                onClick={onToggleCompulsory}
+                title="Toggle whether this requirement is compulsory for this meeting"
+                style={{ fontSize: 12 }}
+              >
+                Make {req.compulsory ? "voluntary" : "compulsory"}
+              </button>
+              <button onClick={onRemove} title="Remove from this meeting" style={{ fontSize: 12, color: "crimson" }}>
+                Remove
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {req.expected_kind === "attendance" && (
@@ -185,6 +218,119 @@ function MediaUpload({ onUpload }: { onUpload: (file: File, kind: string, captio
       <button onClick={submit} disabled={!file || busy}>
         {busy ? "Uploading..." : "Upload"}
       </button>
+    </div>
+  );
+}
+
+const REQ_KINDS = ["text", "media", "attendance", "any"];
+
+function AddRequirement({
+  onAdd,
+  loadAvailable,
+}: {
+  onAdd: (
+    input: { templateId: string } | { label: string; compulsory: number; expectedKind: string }
+  ) => Promise<void>;
+  loadAvailable: () => Promise<AvailableRequirement[]>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [available, setAvailable] = useState<AvailableRequirement[]>([]);
+  const [templateId, setTemplateId] = useState("");
+  const [label, setLabel] = useState("");
+  const [kind, setKind] = useState("text");
+  const [compulsory, setCompulsory] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const openPanel = async () => {
+    setOpen(true);
+    setAvailable(await loadAvailable());
+  };
+
+  const submitTemplate = async () => {
+    if (!templateId) return;
+    setBusy(true);
+    try {
+      await onAdd({ templateId });
+      setTemplateId("");
+      setAvailable(await loadAvailable());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitCustom = async () => {
+    if (!label.trim()) return;
+    setBusy(true);
+    try {
+      await onAdd({ label: label.trim(), compulsory: compulsory ? 1 : 0, expectedKind: kind });
+      setLabel("");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button onClick={openPanel} style={{ marginTop: 12 }}>
+        + Add requirement
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ border: "1px dashed #bbb", padding: 12, margin: "12px 0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <strong>Add requirement</strong>
+        <button onClick={() => setOpen(false)} style={{ fontSize: 12 }}>
+          Close
+        </button>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>From the default templates</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            <option value="">
+              {available.length ? "Choose a template..." : "(none available)"}
+            </option>
+            {available.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+                {t.compulsory ? "" : " (optional)"}
+              </option>
+            ))}
+          </select>
+          <button onClick={submitTemplate} disabled={!templateId || busy}>
+            Add default
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>Or a custom one-off</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            placeholder="Requirement label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            style={{ minWidth: 220 }}
+          />
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            {REQ_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+          <label style={{ fontSize: 13 }}>
+            <input type="checkbox" checked={compulsory} onChange={(e) => setCompulsory(e.target.checked)} />{" "}
+            compulsory
+          </label>
+          <button onClick={submitCustom} disabled={!label.trim() || busy}>
+            Add custom
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
