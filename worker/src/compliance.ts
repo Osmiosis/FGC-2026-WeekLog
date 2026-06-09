@@ -9,6 +9,12 @@ export function daysBetweenUTC(from: string, to: string): number {
   return Math.round((b - a) / 86400000);
 }
 
+export function addDaysUTC(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 // A meeting day's red/amber/green status.
 export function dayRag(input: {
   date: string;
