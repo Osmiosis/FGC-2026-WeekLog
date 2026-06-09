@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import type { Env, Variables } from "./bindings";
 import { requireUser, isAdmin } from "./auth";
 import { members } from "./routes/members";
+import { committees } from "./routes/committees";
 import { templates } from "./routes/templates";
 import { meetingDays } from "./routes/meetingDays";
 import { submissions } from "./routes/submissions";
@@ -36,6 +37,7 @@ app.get("/api/me", requireUser, (c) => {
 });
 
 app.route("/api/members", members);
+app.route("/api/committees", committees);
 app.route("/api/requirement-templates", templates);
 app.route("/api/meeting-days", meetingDays);
 app.route("/api/submissions", submissions);

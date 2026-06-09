@@ -22,3 +22,15 @@ INSERT INTO members (id, name, committee, active) VALUES
   ('m-19', 'Member 19', 'Programming',     1),
   ('m-20', 'Member 20', 'Programming',     1),
   ('m-21', 'Member 21', 'Programming',     1);
+
+-- Normalized committees, derived from the roster above. Used by fresh databases
+-- (tests, local, new deploys); an already-seeded production DB is backfilled by
+-- migration 0007 instead. INSERT OR IGNORE keeps both paths idempotent.
+INSERT OR IGNORE INTO committees (id, name)
+  SELECT 'com-' || lower(replace(replace(committee, '/', '-'), ' ', '-')), committee
+  FROM (SELECT DISTINCT committee FROM members WHERE committee IS NOT NULL AND committee <> '');
+
+INSERT OR IGNORE INTO member_committees (member_id, committee_id)
+  SELECT m.id, 'com-' || lower(replace(replace(m.committee, '/', '-'), ' ', '-'))
+  FROM members m
+  WHERE m.committee IS NOT NULL AND m.committee <> '';

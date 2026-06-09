@@ -86,15 +86,24 @@ meetingDays.get("/:id", requireUser, async (c) => {
 meetingDays.get("/:id/attendance", requireUser, async (c) => {
   const id = c.req.param("id");
   const { results } = await c.env.DB.prepare(
-    `SELECT m.id AS member_id, m.name, m.committee, COALESCE(a.present, 0) AS present
+    `SELECT m.id AS member_id, m.name, COALESCE(a.present, 0) AS present,
+            GROUP_CONCAT(c.name, '|') AS committee_names
      FROM members m
      LEFT JOIN attendance a ON a.member_id = m.id AND a.meeting_day_id = ?
+     LEFT JOIN member_committees mc ON mc.member_id = m.id
+     LEFT JOIN committees c ON c.id = mc.committee_id
      WHERE m.active = 1
-     ORDER BY m.committee, m.name`
+     GROUP BY m.id
+     ORDER BY m.name`
   )
     .bind(id)
-    .all();
-  return c.json(results);
+    .all<{ member_id: string; name: string; present: number; committee_names: string | null }>();
+  return c.json(
+    results.map(({ committee_names, ...r }) => ({
+      ...r,
+      committees: committee_names ? committee_names.split("|").sort() : [],
+    }))
+  );
 });
 
 meetingDays.post("/:id/attendance", requireUser, async (c) => {

@@ -154,7 +154,7 @@ function ReqCard({
                 <span className={"check" + (on ? " on" : "")}><Icon name="check" size={15} /></span>
                 <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
                   <span style={{ fontSize: 13.5, display: "block" }}>{a.name}</span>
-                  {a.committee && <span className="mono-label" style={{ fontSize: 9 }}>{a.committee}</span>}
+                  {a.committees.length > 0 && <span className="mono-label" style={{ fontSize: 9 }}>{a.committees.join(", ")}</span>}
                 </span>
               </button>
             );
