@@ -253,6 +253,78 @@ meetingDays.delete("/:id/requirements/:reqId", requireAdmin, async (c) => {
   return c.json({ ok: true, requirements: derived.requirements });
 });
 
+// Active templates not currently on this meeting — populates the "add default" picker.
+meetingDays.get("/:id/requirements/available", requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const { results } = await c.env.DB.prepare(
+    `SELECT t.id, t.label, t.compulsory, t.expected_kind
+     FROM requirement_templates t
+     WHERE t.active = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM meeting_requirements r
+         WHERE r.meeting_day_id = ? AND r.template_id = t.id AND r.active = 1
+       )
+     ORDER BY t.sort_order`
+  )
+    .bind(id)
+    .all();
+  return c.json(results);
+});
+
+// Add a requirement to this meeting: re-add a template default (reactivate a
+// soft-removed snapshot, else snapshot fresh) or add a custom one-off.
+meetingDays.post("/:id/requirements", requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const b = await c.req.json<{
+    templateId?: string;
+    label?: string;
+    compulsory?: number;
+    expectedKind?: string;
+  }>();
+
+  const day = await c.env.DB.prepare("SELECT id FROM meeting_days WHERE id=?").bind(id).first();
+  if (!day) return c.json({ error: "not found" }, 404);
+
+  if (b.templateId) {
+    const existing = await c.env.DB.prepare(
+      "SELECT id FROM meeting_requirements WHERE meeting_day_id=? AND template_id=?"
+    )
+      .bind(id, b.templateId)
+      .first<{ id: string }>();
+    if (existing) {
+      await c.env.DB.prepare("UPDATE meeting_requirements SET active=1 WHERE id=?")
+        .bind(existing.id)
+        .run();
+    } else {
+      const t = await c.env.DB.prepare(
+        "SELECT label, compulsory, expected_kind FROM requirement_templates WHERE id=? AND active=1"
+      )
+        .bind(b.templateId)
+        .first<{ label: string; compulsory: number; expected_kind: string | null }>();
+      if (!t) return c.json({ error: "template not found" }, 404);
+      await c.env.DB.prepare(
+        "INSERT INTO meeting_requirements (id, meeting_day_id, template_id, label, compulsory, expected_kind, status, active, custom) VALUES (?, ?, ?, ?, ?, ?, 'missing', 1, 0)"
+      )
+        .bind(crypto.randomUUID(), id, b.templateId, t.label, t.compulsory, t.expected_kind)
+        .run();
+    }
+  } else if (b.label) {
+    const kind = b.expectedKind ?? "any";
+    if (!REQ_KINDS.has(kind)) return c.json({ error: "invalid expectedKind" }, 400);
+    const compulsory = b.compulsory ? 1 : 0;
+    await c.env.DB.prepare(
+      "INSERT INTO meeting_requirements (id, meeting_day_id, template_id, label, compulsory, expected_kind, status, active, custom) VALUES (?, ?, NULL, ?, ?, ?, 'missing', 1, 1)"
+    )
+      .bind(crypto.randomUUID(), id, b.label, compulsory, kind)
+      .run();
+  } else {
+    return c.json({ error: "templateId or label required" }, 400);
+  }
+
+  const derived = await recomputeDayCache(c.env, id);
+  return c.json({ ok: true, requirements: derived.requirements }, 201);
+});
+
 // Bulk-mark a recurring pattern (e.g. every Tue + Thu over a date range).
 // Registered before "/:id" matters not (distinct static segment).
 meetingDays.post("/bulk", requireAdmin, async (c) => {

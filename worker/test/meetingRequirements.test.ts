@@ -134,4 +134,106 @@ describe("per-meeting requirement editing", () => {
     );
     expect(missing.status).toBe(404);
   });
+
+  it("lists templates not currently on the meeting as available", async () => {
+    const id = await mark(env, "2026-07-07");
+    const target = (await getReqs(env, id)).find((r) => r.expected_kind === "media")!;
+
+    // Initially no templates are available (all 9 are snapshotted).
+    let res = await app.request(
+      `/api/meeting-days/${id}/requirements/available`,
+      { headers: ADMIN },
+      env as never
+    );
+    expect(((await res.json()) as unknown[]).length).toBe(0);
+
+    // Remove one; its template becomes available again.
+    await app.request(
+      `/api/meeting-days/${id}/requirements/${target.id}`,
+      { method: "DELETE", headers: ADMIN },
+      env as never
+    );
+    res = await app.request(
+      `/api/meeting-days/${id}/requirements/available`,
+      { headers: ADMIN },
+      env as never
+    );
+    const avail = (await res.json()) as Array<{ id: string; label: string }>;
+    expect(avail.length).toBe(1);
+  });
+
+  it("re-adding a removed default reactivates the original row (no duplicate)", async () => {
+    const id = await mark(env, "2026-07-07");
+    const target = (await getReqs(env, id))[0];
+    const templateId = (await db
+      .prepare("SELECT template_id FROM meeting_requirements WHERE id=?")
+      .bind(target.id)
+      .first<{ template_id: string }>())!.template_id;
+
+    await app.request(
+      `/api/meeting-days/${id}/requirements/${target.id}`,
+      { method: "DELETE", headers: ADMIN },
+      env as never
+    );
+    const res = await app.request(
+      `/api/meeting-days/${id}/requirements`,
+      { method: "POST", headers: ADMIN, body: JSON.stringify({ templateId }) },
+      env as never
+    );
+    expect(res.status).toBe(201);
+
+    // Same row id is back (reactivated), not a fresh duplicate.
+    const after = await getReqs(env, id);
+    expect(after.find((r) => r.id === target.id)).toBeTruthy();
+    const total = await db
+      .prepare("SELECT COUNT(*) AS n FROM meeting_requirements WHERE meeting_day_id=? AND template_id=?")
+      .bind(id, templateId)
+      .first<{ n: number }>();
+    expect(total?.n).toBe(1);
+  });
+
+  it("adds a custom one-off requirement (template_id NULL, custom=1)", async () => {
+    const id = await mark(env, "2026-07-07");
+    const res = await app.request(
+      `/api/meeting-days/${id}/requirements`,
+      {
+        method: "POST",
+        headers: ADMIN,
+        body: JSON.stringify({ label: "Sponsor logo placement", compulsory: 1, expectedKind: "media" }),
+      },
+      env as never
+    );
+    expect(res.status).toBe(201);
+
+    const after = await getReqs(env, id);
+    const added = after.find((r) => r.label === "Sponsor logo placement");
+    expect(added).toBeTruthy();
+    expect(added!.compulsory).toBe(1);
+    expect(added!.custom).toBe(1);
+  });
+
+  it("validates add input and gating", async () => {
+    const id = await mark(env, "2026-07-07");
+
+    const badKind = await app.request(
+      `/api/meeting-days/${id}/requirements`,
+      { method: "POST", headers: ADMIN, body: JSON.stringify({ label: "x", expectedKind: "bogus" }) },
+      env as never
+    );
+    expect(badKind.status).toBe(400);
+
+    const empty = await app.request(
+      `/api/meeting-days/${id}/requirements`,
+      { method: "POST", headers: ADMIN, body: JSON.stringify({}) },
+      env as never
+    );
+    expect(empty.status).toBe(400);
+
+    const forbidden = await app.request(
+      `/api/meeting-days/${id}/requirements`,
+      { method: "POST", headers: MEMBER, body: JSON.stringify({ label: "x" }) },
+      env as never
+    );
+    expect(forbidden.status).toBe(403);
+  });
 });
