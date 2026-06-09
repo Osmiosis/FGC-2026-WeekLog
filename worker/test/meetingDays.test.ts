@@ -178,4 +178,48 @@ describe("meeting days + snapshot", () => {
     );
     expect(forbidden.status).toBe(403);
   });
+
+  it("renames a meeting day and clears the title with an empty string", async () => {
+    const res = await mark(env, "2026-07-07");
+    const { id } = (await res.json()) as { id: string };
+
+    const patch = await app.request(
+      `/api/meeting-days/${id}`,
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ title: "  Kickoff sprint  " }) },
+      env as never
+    );
+    expect(patch.status).toBe(200);
+
+    let detail = await app.request(`/api/meeting-days/${id}`, { headers: MEMBER }, env as never);
+    expect(((await detail.json()) as { title: string | null }).title).toBe("Kickoff sprint");
+
+    // Empty/whitespace title clears back to null.
+    const clear = await app.request(
+      `/api/meeting-days/${id}`,
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ title: "   " }) },
+      env as never
+    );
+    expect(clear.status).toBe(200);
+    detail = await app.request(`/api/meeting-days/${id}`, { headers: MEMBER }, env as never);
+    expect(((await detail.json()) as { title: string | null }).title).toBeNull();
+  });
+
+  it("rejects rename of an unknown day (404) and from a member (403)", async () => {
+    const res = await mark(env, "2026-07-07");
+    const { id } = (await res.json()) as { id: string };
+
+    const missing = await app.request(
+      "/api/meeting-days/nope",
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ title: "x" }) },
+      env as never
+    );
+    expect(missing.status).toBe(404);
+
+    const forbidden = await app.request(
+      `/api/meeting-days/${id}`,
+      { method: "PATCH", headers: MEMBER, body: JSON.stringify({ title: "x" }) },
+      env as never
+    );
+    expect(forbidden.status).toBe(403);
+  });
 });

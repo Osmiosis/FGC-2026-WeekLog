@@ -23,8 +23,8 @@ export function useCalendar(year: number, month: number) {
     reload();
   }, [reload]);
 
-  const markDay = async (date: string) => {
-    await api("/api/meeting-days", { method: "POST", body: JSON.stringify({ date }) });
+  const markDay = async (date: string, title?: string) => {
+    await api("/api/meeting-days", { method: "POST", body: JSON.stringify({ date, title: title ?? null }) });
     await reload();
   };
 
