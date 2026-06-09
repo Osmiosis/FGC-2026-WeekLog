@@ -7,7 +7,7 @@ compatibility_date = "2024-09-23"
 [[d1_databases]]
 binding = "DB"
 database_name = "weeklog"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "002c3ab7-b1eb-49eb-91e7-a52d8112cad6"
 migrations_dir = "worker/migrations"
 
 # R2 bucket for media uploads. Create with: wrangler r2 bucket create weeklog-media
@@ -20,7 +20,7 @@ bucket_name = "weeklog-media"
 SUPABASE_URL = "https://euzvqdnonmkechsdtryr.supabase.co"
 ADMIN_EMAIL = "vibha.aarav@gmail.com"
 # Lock CORS to your deployed Pages URL once you have it (defaults to "*" if unset).
-# FRONTEND_ORIGIN = "https://weeklog.pages.dev"
+FRONTEND_ORIGIN = "https://weeklog.pages.dev"
 
 # SUPABASE_ANON_KEY (publishable key) is provided via .dev.vars for local dev.
 # For deploy, set it once with:  wrangler secret put SUPABASE_ANON_KEY
