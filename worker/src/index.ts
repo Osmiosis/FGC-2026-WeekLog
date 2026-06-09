@@ -3,6 +3,7 @@ import type { Env, Variables } from "./bindings";
 import { requireUser, isAdmin } from "./auth";
 import { members } from "./routes/members";
 import { templates } from "./routes/templates";
+import { meetingDays } from "./routes/meetingDays";
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -16,6 +17,7 @@ app.get("/api/me", requireUser, (c) => {
 
 app.route("/api/members", members);
 app.route("/api/requirement-templates", templates);
+app.route("/api/meeting-days", meetingDays);
 
 export default app;
 export type { Env } from "./bindings";
