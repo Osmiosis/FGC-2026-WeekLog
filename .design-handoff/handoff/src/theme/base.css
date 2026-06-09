@@ -1,0 +1,243 @@
+/* ============================================================
+   Team Qatar FGC 2026 — Compliance Tracker
+   Dark editorial design system. Qatar maroon brand chrome,
+   RAG (green / amber / scarlet) status as a separate language.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  /* Surfaces (warm near-black) */
+  --ink:        #0c0c0e;
+  --ink-1:      #121215;
+  --ink-2:      #17171b;
+  --ink-3:      #1f1f24;
+  --line:       rgba(255,255,255,.085);
+  --line-2:     rgba(255,255,255,.16);
+
+  /* Text */
+  --fg:         #f5f3f0;
+  --fg-dim:     #a9a6a1;
+  --fg-faint:   #6e6c69;
+
+  /* Brand — Qatar maroon */
+  --maroon:        #8a1538;
+  --maroon-deep:   #5e0e26;
+  --maroon-bright: #c5466b;   /* lifted, for accent text on dark */
+  --maroon-tint:   rgba(197,70,107,.12);
+
+  /* RAG status (kept distinct from maroon) */
+  --ok:        #34c486;
+  --ok-tint:   rgba(52,196,134,.13);
+  --warn:      #f0a92b;
+  --warn-tint: rgba(240,169,43,.13);
+  --bad:       #ff5a3c;   /* scarlet alert, not maroon */
+  --bad-tint:  rgba(255,90,60,.13);
+
+  --r-sm: 6px;
+  --r:    12px;
+  --r-lg: 18px;
+
+  --mono: 'Space Mono', ui-monospace, monospace;
+  --disp: 'Space Grotesk', system-ui, sans-serif;
+  --body: 'Hanken Grotesk', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; }
+
+.tq {
+  background: var(--ink);
+  color: var(--fg);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.45;
+}
+
+/* ---- Typographic primitives ---- */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin: 0;
+}
+.eyebrow .dot { color: var(--maroon-bright); }
+
+.display {
+  font-family: var(--disp);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  margin: 0;
+}
+
+.index-num {
+  font-family: var(--disp);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-faint);
+  line-height: 1;
+}
+
+.mono-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+/* ---- Hairline rules + serrated motif ---- */
+.rule { height: 1px; background: var(--line); border: 0; }
+
+/* Qatari serrated edge: maroon triangles. Used as a signature divider. */
+.serration {
+  height: 9px;
+  width: 100%;
+  background-image:
+    linear-gradient(135deg, var(--maroon) 50%, transparent 50%),
+    linear-gradient(-135deg, var(--maroon) 50%, transparent 50%);
+  background-size: 16px 9px;
+  background-position: 0 0;
+  background-repeat: repeat-x;
+}
+.serration.vertical {
+  height: 100%;
+  width: 9px;
+  background-image:
+    linear-gradient(45deg, var(--maroon) 50%, transparent 50%),
+    linear-gradient(-45deg, var(--maroon) 50%, transparent 50%);
+  background-size: 9px 16px;
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--ink-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.card-pad { padding: 18px; }
+
+/* ---- Buttons ---- */
+.btn {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--fg);
+  padding: 11px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s, transform .05s;
+  min-height: 44px;
+}
+.btn:hover { background: rgba(255,255,255,.05); border-color: var(--line-2); }
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: var(--maroon);
+  border-color: var(--maroon);
+  color: #fff;
+}
+.btn-primary:hover { background: #9c1a42; border-color: #9c1a42; }
+.btn-ghost { border-color: transparent; color: var(--fg-dim); }
+.btn-ghost:hover { color: var(--fg); }
+.btn-sm { min-height: 36px; padding: 7px 12px; font-size: 13px; }
+
+/* ---- RAG status pill (left-border tinted card, option 4) ---- */
+.rag {
+  --c: var(--ok);
+  --t: var(--ok-tint);
+  position: relative;
+  background: var(--t);
+  border-radius: var(--r-sm);
+  padding: 12px 14px 12px 18px;
+  overflow: hidden;
+}
+.rag::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 5px;
+  background: var(--c);
+}
+.rag.green { --c: var(--ok);   --t: var(--ok-tint); }
+.rag.amber { --c: var(--warn); --t: var(--warn-tint); }
+.rag.red   { --c: var(--bad);  --t: var(--bad-tint); }
+
+/* small inline status tag */
+.tag {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 8px 2px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.tag .ic { width: 13px; height: 13px; flex: none; }
+.tag.green { color: var(--ok);   background: var(--ok-tint); }
+.tag.amber { color: var(--warn); background: var(--warn-tint); }
+.tag.red   { color: var(--bad);  background: var(--bad-tint); }
+.tag.neutral { color: var(--fg-dim); background: rgba(255,255,255,.06); }
+
+/* big overall status hero */
+.hero-status {
+  position: relative;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--ink-1);
+  overflow: hidden;
+}
+
+/* vertical side rail label */
+.rail-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .35em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* logo badge */
+.logo-badge {
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+  flex: none;
+}
+
+/* week strip cell */
+.week-cell {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--ink-1);
+  padding: 12px 10px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.week-cell .bar { position: absolute; left: 0; right: 0; top: 0; height: 3px; }
+.week-cell.green .bar { background: var(--ok); }
+.week-cell.amber .bar { background: var(--warn); }
+.week-cell.red   .bar { background: var(--bad); }
+.week-cell.none  .bar { background: var(--line-2); }
+
+/* progress meter */
+.meter { height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+.meter > i { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+
+a { color: inherit; }
