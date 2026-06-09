@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../auth/AuthProvider";
+import { MeetingDayDetail } from "./MeetingDayDetail";
 
 interface MeetingDay {
   id: string;
@@ -42,6 +43,7 @@ export function CalendarView() {
   const [month, setMonth] = useState(now.getMonth());
   const [marked, setMarked] = useState<Map<string, MeetingDay>>(new Map());
   const [err, setErr] = useState<string | null>(null);
+  const [openDayId, setOpenDayId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -72,16 +74,16 @@ export function CalendarView() {
     } else setMonth(month + 1);
   };
 
-  const toggleDay = async (date: string) => {
-    if (!isAdmin) return;
+  // Clicking a marked day opens its detail. Clicking an unmarked day marks it (admin only).
+  const clickDay = async (date: string) => {
     const existing = marked.get(date);
+    if (existing) {
+      setOpenDayId(existing.id);
+      return;
+    }
+    if (!isAdmin) return;
     try {
-      if (existing) {
-        if (!confirm(`Unmark ${date} as a meeting day? Its requirement checklist is removed.`)) return;
-        await api(`/api/meeting-days/${existing.id}`, { method: "DELETE" });
-      } else {
-        await api("/api/meeting-days", { method: "POST", body: JSON.stringify({ date }) });
-      }
+      await api("/api/meeting-days", { method: "POST", body: JSON.stringify({ date }) });
       await load();
     } catch (e) {
       setErr(String(e));
@@ -97,6 +99,22 @@ export function CalendarView() {
     return arr;
   }, [lead, total]);
 
+  if (openDayId) {
+    return (
+      <MeetingDayDetail
+        dayId={openDayId}
+        onBack={() => {
+          setOpenDayId(null);
+          load();
+        }}
+        onUnmarked={() => {
+          setOpenDayId(null);
+          load();
+        }}
+      />
+    );
+  }
+
   return (
     <section>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
@@ -107,11 +125,11 @@ export function CalendarView() {
         <button onClick={next}>Next</button>
       </div>
       {err && <p style={{ color: "crimson" }}>{err}</p>}
-      {isAdmin && (
-        <p style={{ fontSize: 13, color: "#555" }}>
-          Tap a day to mark or unmark it as a meeting day.
-        </p>
-      )}
+      <p style={{ fontSize: 13, color: "#555" }}>
+        {isAdmin
+          ? "Tap an empty day to mark it as a meeting day. Tap a meeting day to open its checklist."
+          : "Tap a meeting day to open its checklist."}
+      </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
         {WEEKDAYS.map((w) => (
@@ -126,10 +144,10 @@ export function CalendarView() {
           return (
             <div
               key={date}
-              onClick={() => toggleDay(date)}
+              onClick={() => clickDay(date)}
               style={{
                 ...cell,
-                cursor: isAdmin ? "pointer" : "default",
+                cursor: isMeeting || isAdmin ? "pointer" : "default",
                 background: isMeeting ? "#e6f0ff" : "white",
                 outline: isMeeting ? "2px solid #2b6cb0" : "none",
               }}
