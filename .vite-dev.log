@@ -1,0 +1,16 @@
+
+> @weeklog/frontend@0.0.0 dev
+> vite
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m466[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+npm error Lifecycle script `dev` failed with error:
+npm error code 4294967295
+npm error path C:\FGC-2026-WeekLog\frontend
+npm error workspace @weeklog/frontend@0.0.0
+npm error location C:\FGC-2026-WeekLog\frontend
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vite
