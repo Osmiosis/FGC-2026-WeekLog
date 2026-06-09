@@ -53,17 +53,19 @@ describe("zip export + drive seam", () => {
     const md = strFromU8(files["summary.md"]);
     expect(md).toContain("Shooter tuned");
 
-    const mediaName = names.find((n) => n.startsWith("media/"))!;
-    expect(files[mediaName]).toEqual(photoBytes);
+    // Clean filename (no uuid prefix).
+    expect(names).toContain("media/shot.png");
+    expect(files["media/shot.png"]).toEqual(photoBytes);
   });
 
-  it("downloads all media in one ZIP", async () => {
+  it("downloads all media in one ZIP foldered by readable names", async () => {
     const res = await app.request("/api/export/all-media/zip", { headers: MEMBER }, env as never);
     expect(res.status).toBe(200);
     const files = await unzip(res);
     const names = Object.keys(files);
     expect(names.length).toBe(1);
-    expect(names[0]).toContain(`days/${dayId}/`);
+    // Foldered by meeting date, original filename, no uuids.
+    expect(names[0]).toBe("meetings/2026-07-07/shot.png");
   });
 
   it("reports Drive as not configured and treats push as a no-op", async () => {

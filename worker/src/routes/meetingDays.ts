@@ -10,6 +10,7 @@ import {
 } from "../dayStatus";
 import { zipSync, strToU8 } from "fflate";
 import { buildDaySummary } from "../summary";
+import { cleanFileName, uniquePath } from "../names";
 
 export const meetingDays = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -296,7 +297,8 @@ meetingDays.get("/:id/zip", requireUser, async (c) => {
   for (const m of summary.mediaRows) {
     const obj = await c.env.MEDIA.get(m.r2_key);
     if (obj) {
-      files[`media/${m.r2_key.split("/").pop()}`] = new Uint8Array(await obj.arrayBuffer());
+      const path = uniquePath(files, `media/${cleanFileName(m.r2_key)}`);
+      files[path] = new Uint8Array(await obj.arrayBuffer());
     }
   }
   const zipped = zipSync(files, { level: 0 });

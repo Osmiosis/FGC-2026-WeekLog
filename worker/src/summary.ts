@@ -1,5 +1,6 @@
 import type { Env } from "./bindings";
 import { deriveDay, dayStatusFromDerived, todayUTC } from "./dayStatus";
+import { cleanFileName } from "./names";
 
 export interface MediaRow {
   id: string;
@@ -68,7 +69,7 @@ export async function buildDaySummary(
     lines.push(`- [${s.kind}]${s.subsystem ? ` (${s.subsystem})` : ""} ${s.content ?? ""}${s.created_by ? ` (${s.created_by})` : ""}`);
   }
   lines.push("", "## Media");
-  for (const m of media.results) lines.push(`- ${m.r2_key.split("/").pop()}${m.caption ? ` (${m.caption})` : ""}`);
+  for (const m of media.results) lines.push(`- ${cleanFileName(m.r2_key)}${m.caption ? ` (${m.caption})` : ""}`);
 
   return { json, markdown: lines.join("\n"), mediaRows: media.results };
 }
