@@ -2,7 +2,12 @@ import { Hono } from "hono";
 import type { Env, Variables } from "../bindings";
 import { requireUser, requireAdmin } from "../auth";
 import { snapshotRequirements } from "../snapshot";
-import { deriveRequirementStatus, type ReqRow } from "../status";
+import {
+  deriveDay,
+  recomputeDayCache,
+  dayStatusFromDerived,
+  todayUTC,
+} from "../dayStatus";
 
 export const meetingDays = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -24,6 +29,7 @@ function dateRange(start: string, end: string): string[] {
 }
 
 // List meeting days, optionally within a [from, to] range (for the calendar).
+// Each day carries its derived red/amber/green status.
 meetingDays.get("/", requireUser, async (c) => {
   const from = c.req.query("from");
   const to = c.req.query("to");
@@ -33,11 +39,21 @@ meetingDays.get("/", requireUser, async (c) => {
       "SELECT * FROM meeting_days WHERE date >= ? AND date <= ? ORDER BY date"
     )
       .bind(from, to)
-      .all();
+      .all<{ id: string; date: string }>();
   } else {
-    rows = await c.env.DB.prepare("SELECT * FROM meeting_days ORDER BY date").all();
+    rows = await c.env.DB.prepare("SELECT * FROM meeting_days ORDER BY date").all<{
+      id: string;
+      date: string;
+    }>();
   }
-  return c.json(rows.results);
+  const today = todayUTC();
+  const withStatus = await Promise.all(
+    rows.results.map(async (d) => {
+      const derived = await deriveDay(c.env, d.id);
+      return { ...d, status: dayStatusFromDerived(d.date, today, derived) };
+    })
+  );
+  return c.json(withStatus);
 });
 
 // A single meeting day, its requirement checklist with DERIVED submitted/missing
@@ -46,37 +62,15 @@ meetingDays.get("/:id", requireUser, async (c) => {
   const id = c.req.param("id");
   const day = await c.env.DB.prepare("SELECT * FROM meeting_days WHERE id=?")
     .bind(id)
-    .first();
+    .first<{ date: string } & Record<string, unknown>>();
   if (!day) return c.json({ error: "not found" }, 404);
 
-  const reqs = await c.env.DB.prepare(
-    "SELECT id, label, compulsory, expected_kind, status FROM meeting_requirements WHERE meeting_day_id=? ORDER BY compulsory DESC, label"
-  )
-    .bind(id)
-    .all<ReqRow>();
-  const present = await c.env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM attendance WHERE meeting_day_id=? AND present=1"
-  )
-    .bind(id)
-    .first<{ n: number }>();
-  const subs = await c.env.DB.prepare(
-    "SELECT requirement_id, kind FROM submissions WHERE meeting_day_id=?"
-  )
-    .bind(id)
-    .all<{ requirement_id: string | null; kind: string }>();
-  const med = await c.env.DB.prepare(
-    "SELECT requirement_id FROM media WHERE meeting_day_id=?"
-  )
-    .bind(id)
-    .all<{ requirement_id: string | null }>();
-
-  const derived = deriveRequirementStatus(reqs.results, {
-    presentCount: present?.n ?? 0,
-    submissions: subs.results,
-    media: med.results,
-  });
+  // Derive + refresh the cache so viewing a day self-heals its cached status.
+  const derived = await recomputeDayCache(c.env, id);
+  const status = dayStatusFromDerived(day.date, todayUTC(), derived);
   return c.json({
     ...day,
+    status,
     requirements: derived.requirements,
     missingCompulsory: derived.missingCompulsory,
   });
@@ -120,6 +114,7 @@ meetingDays.post("/:id/attendance", requireUser, async (c) => {
       .bind(crypto.randomUUID(), id, b.member_id, present)
       .run();
   }
+  await recomputeDayCache(c.env, id);
   return c.json({ ok: true, member_id: b.member_id, present });
 });
 
@@ -160,6 +155,7 @@ meetingDays.post("/:id/submissions", requireUser, async (c) => {
       new Date().toISOString()
     )
     .run();
+  await recomputeDayCache(c.env, id);
   const row = await c.env.DB.prepare("SELECT * FROM submissions WHERE id=?")
     .bind(subId)
     .first();
@@ -206,6 +202,7 @@ meetingDays.post("/:id/media", requireUser, async (c) => {
       user.email
     )
     .run();
+  await recomputeDayCache(c.env, id);
   const row = await c.env.DB.prepare("SELECT * FROM media WHERE id=?").bind(mediaId).first();
   return c.json(row, 201);
 });

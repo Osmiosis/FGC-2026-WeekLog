@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env, Variables } from "../bindings";
 import { requireUser, isAdmin } from "../auth";
+import { recomputeDayCache } from "../dayStatus";
 
 export const media = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -25,15 +26,16 @@ media.delete("/:id", requireUser, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
   const row = await c.env.DB.prepare(
-    "SELECT r2_key, uploaded_by FROM media WHERE id=?"
+    "SELECT r2_key, uploaded_by, meeting_day_id FROM media WHERE id=?"
   )
     .bind(id)
-    .first<{ r2_key: string; uploaded_by: string | null }>();
+    .first<{ r2_key: string; uploaded_by: string | null; meeting_day_id: string | null }>();
   if (!row) return c.json({ error: "not found" }, 404);
   if (!isAdmin(c.env, user) && row.uploaded_by !== user.email) {
     return c.json({ error: "forbidden" }, 403);
   }
   await c.env.MEDIA.delete(row.r2_key);
   await c.env.DB.prepare("DELETE FROM media WHERE id=?").bind(id).run();
+  if (row.meeting_day_id) await recomputeDayCache(c.env, row.meeting_day_id);
   return c.json({ ok: true });
 });
