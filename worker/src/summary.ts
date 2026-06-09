@@ -24,14 +24,18 @@ export async function buildDaySummary(
   const derived = await deriveDay(env, dayId);
   const status = dayStatusFromDerived(day.date, todayUTC(), derived);
 
-  const present = await env.DB.prepare(
-    `SELECT m.name, m.committee FROM attendance a
+  const presentRaw = await env.DB.prepare(
+    `SELECT m.name, GROUP_CONCAT(c.name, ', ') AS committee FROM attendance a
      JOIN members m ON m.id = a.member_id
+     LEFT JOIN member_committees mc ON mc.member_id = m.id
+     LEFT JOIN committees c ON c.id = mc.committee_id
      WHERE a.meeting_day_id = ? AND a.present = 1
-     ORDER BY m.committee, m.name`
+     GROUP BY m.id
+     ORDER BY m.name`
   )
     .bind(dayId)
     .all<{ name: string; committee: string | null }>();
+  const present = presentRaw;
 
   const submissions = await env.DB.prepare(
     "SELECT kind, subsystem, content, created_by FROM submissions WHERE meeting_day_id=? ORDER BY created_at"

@@ -35,25 +35,50 @@ describe("members CRUD", () => {
       {
         method: "POST",
         headers: ADMIN,
-        body: JSON.stringify({ name: "New Kid", committee: "Programming" }),
+        body: JSON.stringify({ name: "New Kid", committeeIds: ["com-programming", "com-design"] }),
       },
       env as never
     );
     expect(res.status).toBe(201);
-    const row = (await res.json()) as { id: string; name: string; active: number };
+    const row = (await res.json()) as { id: string; name: string; active: number; committees: string[] };
     expect(row.name).toBe("New Kid");
     expect(row.active).toBe(1);
+    expect([...row.committees].sort()).toEqual(["Design", "Programming"]);
   });
 
-  it("lets the admin edit a member", async () => {
+  it("exposes the seeded committee list", async () => {
+    const res = await app.request("/api/committees", { headers: MEMBER }, env as never);
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<{ id: string; name: string }>;
+    expect(rows.length).toBe(9);
+    expect(rows.map((r) => r.name)).toContain("Drivetrain/Collector");
+  });
+
+  it("seeds each member's original committee into the join table", async () => {
+    const res = await app.request("/api/members", { headers: MEMBER }, env as never);
+    const rows = (await res.json()) as Array<{ id: string; committees: string[] }>;
+    expect(rows.find((r) => r.id === "m-01")?.committees).toEqual(["Outreach"]);
+  });
+
+  it("lets the admin rename and replace a member's committees", async () => {
     const res = await app.request(
       "/api/members/m-01",
-      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ name: "Renamed" }) },
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ name: "Renamed", committeeIds: ["com-design", "com-shooter"] }) },
       env as never
     );
     expect(res.status).toBe(200);
-    const row = (await res.json()) as { name: string };
+    const row = (await res.json()) as { name: string; committees: string[] };
     expect(row.name).toBe("Renamed");
+    expect([...row.committees].sort()).toEqual(["Design", "Shooter"]);
+
+    // Editing the name only must not disturb the committee set.
+    const again = await app.request(
+      "/api/members/m-01",
+      { method: "PATCH", headers: ADMIN, body: JSON.stringify({ name: "Renamed Twice" }) },
+      env as never
+    );
+    const row2 = (await again.json()) as { committees: string[] };
+    expect([...row2.committees].sort()).toEqual(["Design", "Shooter"]);
   });
 
   it("soft-deactivates by default and hard-deletes with ?hard=true", async () => {

@@ -6,8 +6,13 @@ export type Rag = "green" | "amber" | "red";
 export interface Member {
   id: string;
   name: string;
-  committee: string | null;
+  committees: string[];
   active: number;
+}
+
+export interface Committee {
+  id: string;
+  name: string;
 }
 
 export interface Template {
@@ -55,7 +60,7 @@ export interface MeetingDayDetail {
 export interface AttendanceRow {
   member_id: string;
   name: string;
-  committee: string | null;
+  committees: string[];
   present: number;
 }
 
