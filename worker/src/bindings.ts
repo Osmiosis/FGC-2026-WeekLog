@@ -5,6 +5,9 @@ export interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   ADMIN_EMAIL: string;
+  // Optional Drive connector config (v1 ships the NullDriveConnector). See drive.ts.
+  DRIVE_ENABLED?: string;
+  DRIVE_FOLDER_ID?: string;
 }
 
 export interface AuthUser {

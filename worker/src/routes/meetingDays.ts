@@ -8,6 +8,8 @@ import {
   dayStatusFromDerived,
   todayUTC,
 } from "../dayStatus";
+import { zipSync, strToU8 } from "fflate";
+import { buildDaySummary } from "../summary";
 
 export const meetingDays = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -268,4 +270,29 @@ meetingDays.delete("/:id", requireAdmin, async (c) => {
     .run();
   await c.env.DB.prepare("DELETE FROM meeting_days WHERE id=?").bind(id).run();
   return c.json({ ok: true });
+});
+
+// Download a day as a ZIP: media files plus summary.md and summary.json.
+meetingDays.get("/:id/zip", requireUser, async (c) => {
+  const id = c.req.param("id");
+  const summary = await buildDaySummary(c.env, id);
+  if (!summary) return c.json({ error: "not found" }, 404);
+
+  const files: Record<string, Uint8Array> = {
+    "summary.md": strToU8(summary.markdown),
+    "summary.json": strToU8(JSON.stringify(summary.json, null, 2)),
+  };
+  for (const m of summary.mediaRows) {
+    const obj = await c.env.MEDIA.get(m.r2_key);
+    if (obj) {
+      files[`media/${m.r2_key.split("/").pop()}`] = new Uint8Array(await obj.arrayBuffer());
+    }
+  }
+  const zipped = zipSync(files, { level: 0 });
+  return new Response(zipped, {
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="meeting-${id}.zip"`,
+    },
+  });
 });

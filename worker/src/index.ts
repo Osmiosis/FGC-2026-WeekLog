@@ -9,6 +9,8 @@ import { media } from "./routes/media";
 import { deadlines } from "./routes/deadlines";
 import { dashboard } from "./routes/dashboard";
 import { search, buildNeeds } from "./routes/search";
+import { exports } from "./routes/exports";
+import { driveRoutes } from "./routes/drive";
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -29,6 +31,8 @@ app.route("/api/deadlines", deadlines);
 app.route("/api/dashboard", dashboard);
 app.route("/api/search", search);
 app.route("/api/build-needs", buildNeeds);
+app.route("/api/export", exports);
+app.route("/api/drive", driveRoutes);
 
 export default app;
 export type { Env } from "./bindings";
