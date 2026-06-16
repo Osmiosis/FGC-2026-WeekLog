@@ -376,7 +376,7 @@ function buildDashboard(db: DemoDB, today: string) {
   const weekStart = addDaysUTC(today, -dow);
   const weekEnd = addDaysUTC(weekStart, 6);
 
-  const dayStatuses = db.meeting_days
+  const dayStatuses = [...db.meeting_days]
     .sort((a, c) => a.date.localeCompare(c.date))
     .map((d) => ({ id: d.id, date: d.date, status: dayStatusFromDerived(d.date, today, deriveDay(db, d.id)) }));
 
