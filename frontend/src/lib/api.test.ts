@@ -1,38 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+// frontend/src/lib/api.test.ts
+import { describe, it, expect, beforeEach } from "vitest";
+import { api, apiForm, apiBlobUrl } from "./api";
 
-// Mock the Supabase client so api() has a token to attach.
-vi.mock("./supabase", () => ({
-  isConfigured: true,
-  supabase: {
-    auth: {
-      getSession: async () => ({
-        data: { session: { access_token: "tok123", expires_at: Math.floor(Date.now() / 1000) + 3600 } },
-      }),
-      refreshSession: async () => ({ data: { session: { access_token: "tok123" } } }),
-    },
-  },
-}));
+beforeEach(() => localStorage.clear());
 
-import { api } from "./api";
-
-describe("api() wiring contract", () => {
-  beforeEach(() => vi.unstubAllGlobals());
-
-  it("attaches the bearer token and targets the given path", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-      new Response(JSON.stringify({ ok: true }), { status: 200 })
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await api("/api/health");
-
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("/api/health");
-    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer tok123");
+describe("demo api layer", () => {
+  it("api() routes GET to the demo router", async () => {
+    const me = await api<{ isAdmin: boolean }>("/api/me");
+    expect(me.isAdmin).toBe(true);
   });
 
-  it("throws on a non-ok response", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
-    await expect(api("/api/x")).rejects.toThrow();
+  it("api() routes a POST with a JSON body", async () => {
+    const days = await api<Array<{ id: string }>>("/api/meeting-days");
+    const id = days[0].id;
+    const att = await api<Array<{ member_id: string }>>(`/api/meeting-days/${id}/attendance`);
+    const res = await api<{ ok: boolean }>(`/api/meeting-days/${id}/attendance`, {
+      method: "POST",
+      body: JSON.stringify({ member_id: att[0].member_id, present: 1 }),
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("apiForm() accepts a media upload and returns a row", async () => {
+    const days = await api<Array<{ id: string }>>("/api/meeting-days");
+    const form = new FormData();
+    form.set("file", new File(["x"], "p.png", { type: "image/png" }));
+    const row = await apiForm<{ id: string }>(`/api/meeting-days/${days[0].id}/media`, form);
+    expect(row.id).toBeTruthy();
+  });
+
+  it("apiBlobUrl() returns a usable URL for media", async () => {
+    const url = await apiBlobUrl("/api/media/anything/file");
+    expect(typeof url).toBe("string");
+    expect(url.length).toBeGreaterThan(0);
   });
 });
