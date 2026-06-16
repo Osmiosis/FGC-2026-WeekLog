@@ -185,32 +185,54 @@ function TextSubmit({ onAdd }: { onAdd: (content: string, subsystem?: string) =>
 }
 
 function MediaUpload({ onUpload }: { onUpload: (file: File, kind: string, caption: string) => void }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [caption, setCaption] = useState("");
   const [kind, setKind] = useState("photo");
-  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
+  // Upload every selected file (the hook takes one at a time, so loop). The
+  // chosen kind/caption apply to all of them. Surfaces a per-file error if one
+  // exceeds the 10 MB cap and stops there.
   const submit = async () => {
-    if (!file) return;
-    setBusy(true);
-    try { await onUpload(file, kind, caption); setFile(null); setCaption(""); } finally { setBusy(false); }
+    if (!files.length) return;
+    setErr(null);
+    for (let i = 0; i < files.length; i++) {
+      setProgress({ done: i, total: files.length });
+      try {
+        await onUpload(files[i], kind, caption);
+      } catch {
+        setErr(`Could not upload "${files[i].name}". Files must be 10 MB or smaller.`);
+        setProgress(null);
+        return;
+      }
+    }
+    setProgress(null);
+    setFiles([]);
+    setCaption("");
   };
+
+  const busy = progress !== null;
+  const pickLabel = files.length === 0
+    ? "Tap to choose photos or files"
+    : files.length === 1 ? files[0].name : `${files.length} files selected`;
 
   return (
     <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-      <label className="thumb striped" style={{ height: 84, border: "1px dashed var(--line-2)", cursor: "pointer", background: "transparent", display: "flex" }}>
-        <input type="file" style={{ display: "none" }} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+      <label className="thumb striped" style={{ height: 84, border: "1px dashed var(--line-2)", cursor: busy ? "default" : "pointer", background: "transparent", display: "flex", opacity: busy ? 0.6 : 1 }}>
+        <input type="file" multiple disabled={busy} style={{ display: "none" }} onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <span className="ph" style={{ flexDirection: "column", gap: 6, height: "100%", width: "100%" }}>
           <Icon name="download" size={20} style={{ transform: "rotate(180deg)" }} />
-          <span className="mono-label" style={{ fontSize: 10 }}>{file ? file.name : "Tap to choose a photo or file"}</span>
+          <span className="mono-label" style={{ fontSize: 10 }}>{pickLabel}</span>
         </span>
       </label>
+      {err && <p style={{ color: "var(--bad)", fontSize: 12 }}>{err}</p>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <input className="input" style={{ flex: 2, minWidth: 140 }} placeholder="Caption" value={caption} onChange={(e) => setCaption(e.target.value)} />
+        <input className="input" style={{ flex: 2, minWidth: 140 }} placeholder="Caption (applied to all)" value={caption} onChange={(e) => setCaption(e.target.value)} />
         <select className="select" style={{ flex: 1, minWidth: 110 }} value={kind} onChange={(e) => setKind(e.target.value)}>
           {["photo", "sketch", "doc", "video"].map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
-        <button className="btn btn-primary" disabled={!file || busy} onClick={submit}>{busy ? "Uploading..." : "Upload"}</button>
+        <button className="btn btn-primary" disabled={!files.length || busy} onClick={submit}>{busy ? `Uploading ${progress!.done + 1}/${progress!.total}...` : "Upload"}</button>
       </div>
     </div>
   );

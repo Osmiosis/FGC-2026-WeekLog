@@ -13,14 +13,17 @@ import { Brand, useWide } from "./ui/primitives";
 
 type Tab = "dashboard" | "calendar" | "deadlines" | "browse" | "members" | "templates";
 
+// Desktop sidebar shows all of MAIN; the mobile bottom bar shows only BAR (Members overflows to "More").
 const MAIN: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: "dashboard", label: "Dashboard", icon: "grid" },
   { id: "calendar", label: "Calendar", icon: "calendar" },
   { id: "deadlines", label: "Deadlines", icon: "flag" },
   { id: "browse", label: "Browse", icon: "search" },
-];
-const ADMIN: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: "members", label: "Members", icon: "users" },
+];
+const BAR = MAIN.slice(0, 4);
+const MEMBERS_TAB = MAIN[4];
+const ADMIN: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: "templates", label: "Requirements", icon: "list" },
 ];
 
@@ -54,7 +57,7 @@ function Shell() {
       {tab === "calendar" && <CalendarView initialOpenDayId={calendarDayId} />}
       {tab === "deadlines" && <DeadlinesView wide={wide} />}
       {tab === "browse" && <BrowseView onOpenDay={openDay} wide={wide} />}
-      {tab === "members" && isAdmin && <MembersAdmin />}
+      {tab === "members" && <MembersAdmin readOnly={!isAdmin} />}
       {tab === "templates" && isAdmin && <TemplatesAdmin />}
     </div>
   );
@@ -103,8 +106,8 @@ function Shell() {
       <div style={{ flex: 1, overflow: "auto", padding: "22px 18px 30px" }}>{Content}</div>
 
       <nav style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", alignItems: "center", padding: "8px 8px calc(8px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--line)", background: "var(--ink-1)" }}>
-        {MAIN.map((t) => <TabBtn key={t.id} t={t} active={tab === t.id} onClick={() => go(t.id)} />)}
-        <TabBtn t={{ label: "More", icon: "list" }} active={more} onClick={() => setMore(true)} />
+        {BAR.map((t) => <TabBtn key={t.id} t={t} active={tab === t.id} onClick={() => go(t.id)} />)}
+        <TabBtn t={{ label: "More", icon: "list" }} active={more || tab === "members"} onClick={() => setMore(true)} />
       </nav>
 
       {more && (
@@ -114,11 +117,11 @@ function Shell() {
             <div className="grab" />
             <p className="eyebrow"><span className="dot">/ </span>Menu</p>
             <div style={{ display: "grid", gap: 6, margin: "14px 0 18px" }}>
-              {isAdmin ? ADMIN.map((t) => (
+              {[MEMBERS_TAB, ...(isAdmin ? ADMIN : [])].map((t) => (
                 <button key={t.id} className="roster-chip" style={{ background: "var(--ink)" }} onClick={() => go(t.id)}>
                   <Icon name={t.icon} size={18} /> <span style={{ fontWeight: 600 }}>{t.label}</span>
                 </button>
-              )) : <p style={{ color: "var(--fg-dim)", fontSize: 14, margin: 0 }}>Admin tools appear here for the team captain.</p>}
+              ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderTop: "1px solid var(--line)" }}>
               <div style={{ flex: 1, minWidth: 0 }}>

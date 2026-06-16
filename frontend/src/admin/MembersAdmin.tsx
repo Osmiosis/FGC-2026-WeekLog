@@ -4,12 +4,15 @@ import type { Member, Committee } from "../lib/hooks/types";
 import { Icon } from "../ui/Icon";
 import { RagTag, ScreenHead, useWide } from "../ui/primitives";
 
-export function MembersAdmin() {
+// readOnly: members see the roster + committees, but no add/edit/deactivate controls.
+export function MembersAdmin({ readOnly = false }: { readOnly?: boolean } = {}) {
   const wide = useWide();
   const { members, committees, error, addMember, updateMember, setActive } = useMembers();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
   const active = members.filter((m) => m.active);
+  // Members only see the active roster; admins also see deactivated rows.
+  const rows = readOnly ? active : members;
 
   const initials = (name: string) => name.split(" ").map((x) => x[0]).join("").slice(0, 2);
   // A member carries committee names; the form works in ids.
@@ -17,26 +20,28 @@ export function MembersAdmin() {
 
   return (
     <div className="screen-in">
-      <ScreenHead num="02" eyebrow="Admin · Roster" title="Members" wide={wide}
+      <ScreenHead num="02" eyebrow={readOnly ? "Roster" : "Admin · Roster"} title="Members" wide={wide}
         sub={`${active.length} active across ${committees.length} committees.`} />
       {error && <p style={{ color: "var(--bad)" }}>{error}</p>}
 
-      <button className="btn btn-primary" style={{ marginBottom: 18 }} onClick={() => setAdding(true)}><Icon name="users" size={16} /> Add member</button>
+      {!readOnly && <button className="btn btn-primary" style={{ marginBottom: 18 }} onClick={() => setAdding(true)}><Icon name="users" size={16} /> Add member</button>}
 
       {wide ? (
         <div className="card" style={{ overflow: "hidden" }}>
           <table className="tbl">
-            <thead><tr><th>Name</th><th>Committees</th><th>Status</th><th style={{ textAlign: "right" }}>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Committees</th><th>Status</th>{!readOnly && <th style={{ textAlign: "right" }}>Actions</th>}</tr></thead>
             <tbody>
-              {members.map((m) => (
+              {rows.map((m) => (
                 <tr key={m.id} style={{ opacity: m.active ? 1 : 0.5 }}>
                   <td style={{ fontWeight: 600 }}>{m.name}</td>
                   <td><span className="mono-label" style={{ fontSize: 11 }}>{m.committees.join(", ") || "—"}</span></td>
                   <td>{m.active ? <RagTag status="green">Active</RagTag> : <span className="tag neutral">Inactive</span>}</td>
-                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                    <button className="btn btn-sm btn-ghost" onClick={() => setEditing(m)}>Edit</button>
-                    <button className="btn btn-sm btn-ghost" onClick={() => setActive(m.id, m.active ? 0 : 1)}>{m.active ? "Deactivate" : "Reactivate"}</button>
-                  </td>
+                  {!readOnly && (
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setEditing(m)}>Edit</button>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setActive(m.id, m.active ? 0 : 1)}>{m.active ? "Deactivate" : "Reactivate"}</button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -44,25 +49,25 @@ export function MembersAdmin() {
         </div>
       ) : (
         <div className="stagger" style={{ display: "grid", gap: 10 }}>
-          {members.map((m) => (
+          {rows.map((m) => (
             <div key={m.id} className="data-row" style={{ display: "flex", alignItems: "center", gap: 12, opacity: m.active ? 1 : 0.5 }}>
               <div style={{ width: 38, height: 38, borderRadius: 50, background: "var(--maroon-tint)", color: "var(--maroon-bright)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 14, flex: "none" }}>{initials(m.name)}</div>
-              <div style={{ flex: 1, minWidth: 0 }} onClick={() => setEditing(m)}>
+              <div style={{ flex: 1, minWidth: 0 }} onClick={readOnly ? undefined : () => setEditing(m)}>
                 <div style={{ fontWeight: 600, fontSize: 15 }}>{m.name}</div>
                 <div className="mono-label" style={{ fontSize: 10 }}>{m.committees.join(", ") || "—"}</div>
               </div>
-              <button className="btn btn-sm btn-ghost" onClick={() => setEditing(m)}>Edit</button>
-              <button className={"toggle" + (m.active ? " on" : "")} onClick={() => setActive(m.id, m.active ? 0 : 1)}><i /></button>
+              {!readOnly && <button className="btn btn-sm btn-ghost" onClick={() => setEditing(m)}>Edit</button>}
+              {!readOnly && <button className={"toggle" + (m.active ? " on" : "")} onClick={() => setActive(m.id, m.active ? 0 : 1)}><i /></button>}
             </div>
           ))}
         </div>
       )}
 
-      {adding && (
+      {!readOnly && adding && (
         <MemberForm title="Add member" committees={committees} onClose={() => setAdding(false)}
           onSave={async (name, ids) => { await addMember(name, ids); setAdding(false); }} />
       )}
-      {editing && (
+      {!readOnly && editing && (
         <MemberForm title="Edit member" committees={committees} initialName={editing.name} initialIds={idsFor(editing)}
           onClose={() => setEditing(null)}
           onSave={async (name, ids) => { await updateMember(editing.id, { name, committeeIds: ids }); setEditing(null); }} />
