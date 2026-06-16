@@ -1,6 +1,6 @@
 // frontend/src/lib/demo/compute.test.ts
 import { describe, it, expect } from "vitest";
-import { dayRag, deadlineRag, deriveRequirementStatus, deriveDay, dayStatusFromDerived } from "./compute";
+import { dayRag, deadlineRag, deriveRequirementStatus, deriveDay, dayStatusFromDerived, committeesOf } from "./compute";
 import type { DemoDB } from "./types";
 
 describe("dayRag", () => {
@@ -58,5 +58,87 @@ describe("deriveDay + dayStatusFromDerived", () => {
     const derived = deriveDay(db2, "d1");
     expect(derived.missingCompulsory).toHaveLength(0);
     expect(dayStatusFromDerived("2026-01-10", "2026-02-01", derived)).toBe("green");
+  });
+});
+
+describe("committeesOf", () => {
+  const db: DemoDB = {
+    committees: [
+      { id: "c2", name: "Zeta", sort_order: 2 },
+      { id: "c1", name: "Alpha", sort_order: 1 },
+    ],
+    members: [{ id: "m1", name: "Alice", active: 1 }],
+    member_committees: [
+      { member_id: "m1", committee_id: "c2" },
+      { member_id: "m1", committee_id: "c1" },
+    ],
+    templates: [], meeting_days: [], meeting_requirements: [],
+    attendance: [], submissions: [], media: [], deadlines: [],
+  };
+
+  it("returns committee names sorted alphabetically for a member with two committees", () => {
+    expect(committeesOf(db, "m1")).toEqual(["Alpha", "Zeta"]);
+  });
+
+  it("returns [] for a member with no committees", () => {
+    expect(committeesOf(db, "m2")).toEqual([]);
+  });
+});
+
+describe("deriveDay excludes inactive requirements", () => {
+  const db: DemoDB = {
+    committees: [], members: [], member_committees: [], templates: [],
+    meeting_days: [{ id: "d1", date: "2026-02-10", title: null }],
+    meeting_requirements: [
+      { id: "r-active", meeting_day_id: "d1", template_id: null, label: "Active Req", compulsory: 1, expected_kind: "text", status: "missing", active: 1, custom: 0 },
+      { id: "r-inactive", meeting_day_id: "d1", template_id: null, label: "Inactive Req", compulsory: 1, expected_kind: "text", status: "missing", active: 0, custom: 0 },
+    ],
+    attendance: [], submissions: [], media: [], deadlines: [],
+  };
+
+  it("only includes active requirements; inactive are excluded", () => {
+    const derived = deriveDay(db, "d1");
+    expect(derived.requirements).toHaveLength(1);
+    expect(derived.requirements[0].id).toBe("r-active");
+  });
+});
+
+describe("media fallback branch", () => {
+  const db: DemoDB = {
+    committees: [], members: [], member_committees: [], templates: [],
+    meeting_days: [{ id: "d1", date: "2026-02-10", title: null }],
+    meeting_requirements: [
+      { id: "r-media", meeting_day_id: "d1", template_id: null, label: "Media Upload", compulsory: 1, expected_kind: "media", status: "missing", active: 1, custom: 0 },
+    ],
+    attendance: [],
+    submissions: [],
+    media: [{ id: "media1", meeting_day_id: "d1", deadline_id: null, requirement_id: null, subsystem: null, caption: null, kind: "photo", content_type: "image/jpeg", uploaded_by: null, uploaded_at: "2026-02-10T12:00:00Z" }],
+    deadlines: [],
+  };
+
+  it("unassigned media row satisfies a media requirement (fallback)", () => {
+    const derived = deriveDay(db, "d1");
+    expect(derived.requirements.find((r) => r.id === "r-media")!.status).toBe("submitted");
+    expect(derived.missingCompulsory).toHaveLength(0);
+  });
+});
+
+describe("any branch", () => {
+  const db: DemoDB = {
+    committees: [], members: [], member_committees: [], templates: [],
+    meeting_days: [{ id: "d1", date: "2026-02-10", title: null }],
+    meeting_requirements: [
+      { id: "r-any", meeting_day_id: "d1", template_id: null, label: "Any Submission", compulsory: 1, expected_kind: "any", status: "missing", active: 1, custom: 0 },
+    ],
+    attendance: [],
+    submissions: [{ id: "s1", meeting_day_id: "d1", requirement_id: null, kind: "note", subsystem: null, content: "something", created_by: null, created_at: "2026-02-10T10:00:00Z", resolved: 0 }],
+    media: [],
+    deadlines: [],
+  };
+
+  it("single submission satisfies an any requirement", () => {
+    const derived = deriveDay(db, "d1");
+    expect(derived.requirements.find((r) => r.id === "r-any")!.status).toBe("submitted");
+    expect(derived.missingCompulsory).toHaveLength(0);
   });
 });
