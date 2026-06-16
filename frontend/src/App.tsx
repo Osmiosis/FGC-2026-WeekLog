@@ -10,6 +10,7 @@ import { MembersAdmin } from "./admin/MembersAdmin";
 import { TemplatesAdmin } from "./admin/TemplatesAdmin";
 import { Icon, type IconName } from "./ui/Icon";
 import { Brand, useWide } from "./ui/primitives";
+import { DemoBadge } from "./ui/DemoBadge";
 
 type Tab = "dashboard" | "calendar" | "deadlines" | "browse" | "members" | "templates";
 
@@ -66,6 +67,7 @@ function Shell() {
   if (wide) {
     return (
       <div className="tq" style={{ height: "100vh", display: "flex" }}>
+        <DemoBadge />
         <aside style={{ flex: "none", width: 256, borderRight: "1px solid var(--line)", background: "var(--ink-1)", display: "flex", flexDirection: "column", padding: "24px 16px" }}>
           <div style={{ padding: "0 8px 22px" }}><Brand size={38} /></div>
           <nav style={{ display: "grid", gap: 3 }}>{MAIN.map((t) => <NavItem key={t.id} t={t} active={tab === t.id} onClick={() => go(t.id)} />)}</nav>
@@ -99,6 +101,7 @@ function Shell() {
   // ---------------------------------------------------- mobile: bottom tabs
   return (
     <div className="tq" style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+      <DemoBadge />
       <header style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
         <Brand size={32} />
         <button className="btn btn-ghost btn-sm" style={{ width: 38, padding: 0, justifyContent: "center" }} aria-label="Notifications"><Icon name="bell" size={19} /></button>
