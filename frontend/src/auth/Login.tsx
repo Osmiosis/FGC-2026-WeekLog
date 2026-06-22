@@ -3,8 +3,9 @@ import { useAuth } from "./AuthProvider";
 import { Icon } from "../ui/Icon";
 
 // Passwordless magic-link login. Keeps the useAuth().sendMagicLink contract;
-// all styling lives in the theme CSS.
-export function Login() {
+// all styling lives in the theme CSS. In the open-access model this is shown
+// on demand (admins only); onBack dismisses it back to the public app.
+export function Login({ onBack }: { onBack?: () => void } = {}) {
   const { sendMagicLink } = useAuth();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -28,6 +29,11 @@ export function Login() {
       </div>
 
       <div style={{ maxWidth: 560, width: "100%", margin: "0 auto", padding: "8vh 28px 6vh", paddingRight: 74 }}>
+        {onBack && (
+          <button className="btn btn-ghost btn-sm" style={{ marginBottom: 22 }} onClick={onBack}>
+            <Icon name="arrow" size={15} style={{ transform: "rotate(180deg)" }} /> Back to logbook
+          </button>
+        )}
         <div className="serration" style={{ width: 120, marginBottom: 30 }} />
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 48 }}>

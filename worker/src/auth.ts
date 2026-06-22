@@ -31,16 +31,19 @@ function bearerToken(c: Context): string | null {
   return match ? match[1] : null;
 }
 
-// Any signed-in user. Attaches the user to the request context.
+// Open-access model: the logbook is public at "member" level. This middleware no
+// longer blocks — it attaches the signed-in user when a valid bearer token is
+// present, otherwise an anonymous member. Routes that must stay private (admin
+// config) gate with requireAdmin below, which still enforces login.
+const ANON: AuthUser = { id: "", email: "" };
+
 export const requireUser = createMiddleware<{
   Bindings: Env;
   Variables: Variables;
 }>(async (c, next) => {
   const token = bearerToken(c);
-  if (!token) return c.json({ error: "unauthorized" }, 401);
-  const user = await getUser(c.env, token);
-  if (!user) return c.json({ error: "unauthorized" }, 401);
-  c.set("user", user);
+  const user = token ? await getUser(c.env, token) : null;
+  c.set("user", user ?? ANON);
   await next();
 });
 
