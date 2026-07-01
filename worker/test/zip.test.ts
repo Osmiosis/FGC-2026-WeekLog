@@ -63,9 +63,34 @@ describe("zip export + drive seam", () => {
     expect(res.status).toBe(200);
     const files = await unzip(res);
     const names = Object.keys(files);
-    expect(names.length).toBe(1);
     // Foldered by meeting date, original filename, no uuids.
-    expect(names[0]).toBe("meetings/2026-07-07/shot.png");
+    expect(names).toContain("meetings/2026-07-07/shot.png");
+    // Text travels with the media: per-meeting summary carries the submission.
+    expect(names).toContain("meetings/2026-07-07/summary.md");
+    expect(strFromU8(files["meetings/2026-07-07/summary.md"])).toContain("Shooter tuned");
+  });
+
+  it("streams every media file when several share a day (and a filename)", async () => {
+    // Two more uploads, one colliding on the original filename, exercise the
+    // sequential streaming path and uniquePath de-duplication.
+    for (const [name, bytes] of [
+      ["clip.mp4", new Uint8Array([1, 2, 3])],
+      ["shot.png", new Uint8Array([9, 9, 9, 9, 9])], // same name as beforeEach upload
+    ] as const) {
+      const form = new FormData();
+      form.set("file", new File([bytes], name, { type: "application/octet-stream" }));
+      await app.request(`/api/meeting-days/${dayId}/media`, { method: "POST", headers: MEMBER, body: form }, env as never);
+    }
+
+    const res = await app.request("/api/export/all-media/zip", { headers: MEMBER }, env as never);
+    expect(res.status).toBe(200);
+    const files = await unzip(res);
+    const names = Object.keys(files);
+    // All three media land, and the duplicate name is disambiguated, not dropped.
+    expect(names).toContain("meetings/2026-07-07/shot.png");
+    expect(names).toContain("meetings/2026-07-07/clip.mp4");
+    expect(names).toContain("meetings/2026-07-07/shot (2).png");
+    expect(files["meetings/2026-07-07/clip.mp4"]).toEqual(new Uint8Array([1, 2, 3]));
   });
 
   it("reports Drive as not configured and treats push as a no-op", async () => {

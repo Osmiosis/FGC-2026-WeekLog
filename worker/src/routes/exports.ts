@@ -1,8 +1,10 @@
 import { Hono } from "hono";
-import { zipSync } from "fflate";
+import { strToU8 } from "fflate";
 import type { Env, Variables } from "../bindings";
 import { requireUser } from "../auth";
 import { cleanFileName, sanitizeFolder, uniquePath } from "../names";
+import { buildDaySummary, buildDeadlineMarkdown, type MediaRow } from "../summary";
+import { streamZip, type ZipEntry } from "../zipStream";
 
 // Bulk exports (mounted at /api/export).
 export const exports = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -17,9 +19,37 @@ interface MediaJoin {
   dl_due: string | null;
 }
 
-// All media in one ZIP, foldered by meeting date (or deadline title) with
-// human-readable file names.
+// Folder names must match between media bytes and the text summary so each
+// meeting/deadline's files land together.
+function meetingFolder(date: string | null, title: string | null): string {
+  const name = title ? `${date} - ${sanitizeFolder(title)}` : date ?? "unknown-date";
+  return `meetings/${name}`;
+}
+function deadlineFolder(title: string | null, due: string | null): string {
+  return `deadlines/${sanitizeFolder(title ?? due ?? "deadline")}`;
+}
+
+// Everything in one ZIP: media foldered by meeting date (or deadline title)
+// alongside a summary.md / summary.json per meeting and a summary.md per
+// deadline, so strategy notes, build needs, accomplishments, etc. travel with
+// the photos.
 exports.get("/all-media/zip", requireUser, async (c) => {
+  // Build the entry manifest first (metadata only — cheap). Media bytes are
+  // pulled from R2 one at a time while the ZIP streams out, so the whole archive
+  // never sits in memory at once. The old approach buffered every file plus the
+  // full zipSync output simultaneously, which OOMs the 128 MB Worker isolate —
+  // Cloudflare then kills the request with an HTML 503 that never reaches our
+  // onError handler.
+  const used: Record<string, true> = {};
+  const reserve = (path: string) => {
+    const p = uniquePath(used, path);
+    used[p] = true;
+    return p;
+  };
+
+  const entries: ZipEntry[] = [];
+
+  // 1. Media (bytes resolved lazily during streaming below).
   const { results } = await c.env.DB.prepare(
     `SELECT m.r2_key, m.meeting_day_id, m.deadline_id,
             md.date AS day_date, md.title AS day_title,
@@ -29,31 +59,39 @@ exports.get("/all-media/zip", requireUser, async (c) => {
      LEFT JOIN deadlines dl ON dl.id = m.deadline_id
      ORDER BY md.date, dl.due_date`
   ).all<MediaJoin>();
-
-  const files: Record<string, Uint8Array> = {};
   for (const m of results) {
-    const obj = await c.env.MEDIA.get(m.r2_key);
-    if (!obj) continue;
-
     let folder: string;
-    if (m.meeting_day_id) {
-      const name = m.day_title ? `${m.day_date} - ${sanitizeFolder(m.day_title)}` : m.day_date ?? "unknown-date";
-      folder = `meetings/${name}`;
-    } else if (m.deadline_id) {
-      folder = `deadlines/${sanitizeFolder(m.dl_title ?? m.dl_due ?? "deadline")}`;
-    } else {
-      folder = "other";
-    }
-
-    const path = uniquePath(files, `${folder}/${cleanFileName(m.r2_key)}`);
-    files[path] = new Uint8Array(await obj.arrayBuffer());
+    if (m.meeting_day_id) folder = meetingFolder(m.day_date, m.day_title);
+    else if (m.deadline_id) folder = deadlineFolder(m.dl_title, m.dl_due);
+    else folder = "other";
+    entries.push({ path: reserve(`${folder}/${cleanFileName(m.r2_key)}`), r2Key: m.r2_key });
   }
 
-  const zipped = zipSync(files, { level: 0 });
-  return new Response(zipped, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": 'attachment; filename="all-media.zip"',
-    },
-  });
+  // 2. Per-meeting text summaries (every day, even ones with no media).
+  const days = await c.env.DB.prepare(
+    "SELECT id, date, title FROM meeting_days ORDER BY date"
+  ).all<{ id: string; date: string; title: string | null }>();
+  for (const d of days.results) {
+    const summary = await buildDaySummary(c.env, d.id);
+    if (!summary) continue;
+    const folder = meetingFolder(d.date, d.title);
+    entries.push({ path: reserve(`${folder}/summary.md`), bytes: strToU8(summary.markdown) });
+    entries.push({ path: reserve(`${folder}/summary.json`), bytes: strToU8(JSON.stringify(summary.json, null, 2)) });
+  }
+
+  // 3. Per-deadline text summaries.
+  const dls = await c.env.DB.prepare(
+    "SELECT id, title, description, category, due_date, status, link FROM deadlines ORDER BY due_date"
+  ).all<{ id: string; title: string; description: string | null; category: string | null; due_date: string; status: string | null; link: string | null }>();
+  for (const d of dls.results) {
+    const dmed = await c.env.DB.prepare(
+      "SELECT id, r2_key, caption, kind, content_type FROM media WHERE deadline_id=? ORDER BY uploaded_at"
+    )
+      .bind(d.id)
+      .all<MediaRow>();
+    const folder = deadlineFolder(d.title, d.due_date);
+    entries.push({ path: reserve(`${folder}/summary.md`), bytes: strToU8(buildDeadlineMarkdown(d, dmed.results)) });
+  }
+
+  return streamZip(c.env, entries, "all-media.zip");
 });

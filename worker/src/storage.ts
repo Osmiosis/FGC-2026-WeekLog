@@ -4,7 +4,7 @@ import type { Env } from "./bindings";
 // that line so the bucket can never cross the free limit by accident. Egress on
 // R2 is free, and ~21 users will not approach the 1M write / 10M read op limits,
 // so storage volume is the only meaningful guard.
-export const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB per file
+export const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file (CAD/STEP headroom)
 export const STORAGE_CEILING_BYTES = 8 * 1024 * 1024 * 1024; // 8 GB total (margin under 10 GB)
 
 export type BudgetResult = { ok: true } | { ok: false; status: 413 | 507; error: string };
