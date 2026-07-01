@@ -120,7 +120,7 @@ function Shell() {
 
       <nav style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", alignItems: "center", padding: "8px 8px calc(8px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--line)", background: "var(--ink-1)" }}>
         {BAR.map((t) => <TabBtn key={t.id} t={t} active={tab === t.id} onClick={() => go(t.id)} />)}
-        <TabBtn t={{ label: "More", icon: "list" }} active={more || tab === "members"} onClick={() => setMore(true)} />
+        <TabBtn t={{ label: "More", icon: "list" }} active={more || OVERFLOW.some((t) => t.id === tab)} onClick={() => setMore(true)} />
       </nav>
 
       {more && (

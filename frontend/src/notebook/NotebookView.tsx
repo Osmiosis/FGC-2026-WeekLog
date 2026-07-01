@@ -14,7 +14,7 @@ const TABS: { id: NbTab; label: string; ready: boolean }[] = [
 
 export function NotebookView() {
   const { isAdmin } = useAuth();
-  const { timeline, reports, pending, busy, generateTimeline, requestRefresh } = useNotebook();
+  const { timeline, reports, pending, error, busy, generateTimeline, requestRefresh } = useNotebook();
   const [tab, setTab] = useState<NbTab>("timeline");
   const timelinePending = pending.find((p) => p.kind === "timeline")?.count ?? 0;
   const generatedAt = reports?.timeline?.generated_at ?? null;
@@ -56,6 +56,7 @@ export function NotebookView() {
         <span className="mono-label" style={{ color: "var(--fg-faint)" }}>
           {generatedAt ? `Last updated ${fmtDate(generatedAt)}` : "Not generated yet"}
         </span>
+        {error && <p className="mono-label" style={{ color: "var(--bad)" }}>{error}</p>}
       </div>
 
       {tab === "timeline" &&

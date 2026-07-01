@@ -11,6 +11,7 @@ export function useNotebook() {
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(() => {
+    setError(null);
     api<NotebookReportsMap>("/api/notebook/reports").then(setReports).catch((e) => setError(String(e)));
     api<PendingRequestSummary[]>("/api/notebook/requests").then(setPending).catch(() => setPending([]));
   }, []);

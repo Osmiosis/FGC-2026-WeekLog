@@ -43,25 +43,30 @@ export function TimelineTab({ payload }: { payload: TimelinePayload }) {
       </div>
 
       <div style={{ display: "grid", gap: 12 }}>
-        {current.entries.map((e, i) => {
-          const photos = photosFor(e.date);
-          return (
-            <div key={i} className="card card-pad">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 50, background: KIND_COLOR[e.kind], flex: "none" }} />
-                <span className="mono-label">{KIND_LABEL[e.kind]}</span>
-                <span className="mono-label" style={{ marginLeft: "auto", color: "var(--fg-faint)" }}>{fmtDate(e.date)}</span>
-              </div>
-              <div style={{ fontSize: 15 }}>{e.text}</div>
-              {e.created_by && <div className="mono-label" style={{ marginTop: 6, color: "var(--fg-faint)" }}>{e.created_by}</div>}
-              {photos.length > 0 && (
-                <div className="mono-label" style={{ marginTop: 8, color: "var(--fg-dim)" }}>
-                  Photos this meeting: {photos.map((p) => p.caption || p.kind).join(", ")}
+        {(() => {
+          const seenDates = new Set<string>();
+          return current.entries.map((e, i) => {
+            const showPhotos = !seenDates.has(e.date);
+            seenDates.add(e.date);
+            const photos = showPhotos ? photosFor(e.date) : [];
+            return (
+              <div key={i} className="card card-pad">
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 50, background: KIND_COLOR[e.kind], flex: "none" }} />
+                  <span className="mono-label">{KIND_LABEL[e.kind]}</span>
+                  <span className="mono-label" style={{ marginLeft: "auto", color: "var(--fg-faint)" }}>{fmtDate(e.date)}</span>
                 </div>
-              )}
-            </div>
-          );
-        })}
+                <div style={{ fontSize: 15 }}>{e.text}</div>
+                {e.created_by && <div className="mono-label" style={{ marginTop: 6, color: "var(--fg-faint)" }}>{e.created_by}</div>}
+                {photos.length > 0 && (
+                  <div className="mono-label" style={{ marginTop: 8, color: "var(--fg-dim)" }}>
+                    Photos this meeting: {photos.map((p) => p.caption || p.kind).join(", ")}
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })()}
       </div>
     </div>
   );
