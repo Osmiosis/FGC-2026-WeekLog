@@ -98,3 +98,5 @@ export interface Deadline {
   completed_at: string | null;
   link: string | null;
 }
+
+export * from "./notebook";
