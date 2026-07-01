@@ -93,6 +93,19 @@ describe("zip export + drive seam", () => {
     expect(files["meetings/2026-07-07/clip.mp4"]).toEqual(new Uint8Array([1, 2, 3]));
   });
 
+  it("serves a client-ZIP manifest: media by id, summaries inline, no bytes", async () => {
+    const res = await app.request("/api/export/manifest", { headers: MEMBER }, env as never);
+    expect(res.status).toBe(200);
+    const { entries } = (await res.json()) as {
+      entries: { path: string; mediaId?: string; text?: string }[];
+    };
+    const media = entries.find((e) => e.path === "meetings/2026-07-07/shot.png");
+    expect(media?.mediaId).toBeTruthy(); // browser fetches bytes from /api/media/:id/file
+    expect(media).not.toHaveProperty("text"); // no bytes travel in the manifest
+    const summary = entries.find((e) => e.path === "meetings/2026-07-07/summary.md");
+    expect(summary?.text).toContain("Shooter tuned");
+  });
+
   it("reports Drive as not configured and treats push as a no-op", async () => {
     const status = await app.request("/api/drive/status", { headers: MEMBER }, env as never);
     expect((await status.json()) as unknown).toEqual({ configured: false });
