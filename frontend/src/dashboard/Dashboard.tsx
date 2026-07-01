@@ -32,7 +32,7 @@ export function Dashboard({
   onOpenDay: (id: string) => void;
   onGoToDeadlines: () => void;
 }) {
-  const { data: d, driveConfigured, error, downloadAllMedia } = useDashboard();
+  const { data: d, driveConfigured, error, downloadAllMedia, downloading, downloadError } = useDashboard();
 
   if (error) return <p style={{ color: "var(--bad)", padding: 4 }}>{error}</p>;
   if (!d) return <p className="mono-label" style={{ padding: 4 }}>Loading...</p>;
@@ -148,9 +148,11 @@ export function Dashboard({
 
   const Export = (
     <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-      <button className="btn" onClick={downloadAllMedia}><Icon name="download" size={16} /> Download all media (ZIP)</button>
-      <p className="mono-label" style={{ flex: 1, minWidth: 180, lineHeight: 1.5, color: "var(--fg-faint)" }}>
-        {driveConfigured ? "Drive sync is configured." : "Drive sync not configured. Export a ZIP and upload to the mentors' Drive."}
+      <button className="btn" onClick={downloadAllMedia} disabled={downloading}>
+        <Icon name="download" size={16} /> {downloading ? "Preparing ZIP…" : "Download all media (ZIP)"}
+      </button>
+      <p className="mono-label" style={{ flex: 1, minWidth: 180, lineHeight: 1.5, color: downloadError ? "var(--bad)" : "var(--fg-faint)" }}>
+        {downloadError ?? (driveConfigured ? "Drive sync is configured." : "Drive sync not configured. Export a ZIP and upload to the mentors' Drive.")}
       </p>
     </div>
   );
