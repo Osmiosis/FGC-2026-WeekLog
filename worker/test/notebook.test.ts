@@ -40,4 +40,71 @@ describe("notebook prep", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  async function seedSeason() {
+    const mk = await app.request(
+      "/api/meeting-days",
+      { method: "POST", headers: ADMIN, body: JSON.stringify({ date: "2026-07-07" }) },
+      env as never
+    );
+    const dayId = ((await mk.json()) as { id: string }).id;
+    const sub = (kind: string, subsystem: string | null, content: string) =>
+      app.request(
+        `/api/meeting-days/${dayId}/submissions`,
+        { method: "POST", headers: MEMBER, body: JSON.stringify({ kind, subsystem, content }) },
+        env as never
+      );
+    await sub("accomplishment", "Shooter", "Shooter tuned");
+    await sub("failure", "Climber", "Hook slipped");
+    await sub("note", null, "General note");
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array([1, 2, 3])], "shot.png", { type: "image/png" }));
+    await app.request(`/api/meeting-days/${dayId}/media`, { method: "POST", headers: MEMBER, body: form }, env as never);
+    return dayId;
+  }
+
+  it("admin generate builds the timeline snapshot from logged data", async () => {
+    await seedSeason();
+    const gen = await app.request("/api/notebook/generate/timeline", { method: "POST", headers: ADMIN }, env as never);
+    expect(gen.status).toBe(200);
+
+    const map = (await (await app.request("/api/notebook/reports", { headers: MEMBER }, env as never)).json()) as Record<
+      string,
+      { payload: { subsystems: { name: string; entries: { text: string; kind: string }[] }[]; photosByDate: { date: string; photos: unknown[] }[] } }
+    >;
+    const tl = map.timeline.payload;
+    const names = tl.subsystems.map((s) => s.name);
+    expect(names).toContain("Shooter");
+    expect(names).toContain("Climber");
+    expect(names).toContain("Uncategorized"); // the null-subsystem note lands here
+    const shooter = tl.subsystems.find((s) => s.name === "Shooter")!;
+    expect(shooter.entries[0]).toMatchObject({ text: "Shooter tuned", kind: "accomplishment" });
+    expect(tl.photosByDate).toEqual([{ date: "2026-07-07", photos: [{ caption: "", kind: expect.any(String) }] }]);
+  });
+
+  it("generate is admin-only and fulfils pending timeline requests", async () => {
+    await seedSeason();
+    await app.request(
+      "/api/notebook/requests",
+      { method: "POST", headers: MEMBER, body: JSON.stringify({ kind: "timeline" }) },
+      env as never
+    );
+
+    const forbidden = await app.request("/api/notebook/generate/timeline", { method: "POST", headers: MEMBER }, env as never);
+    expect(forbidden.status).toBe(403);
+
+    await app.request("/api/notebook/generate/timeline", { method: "POST", headers: ADMIN }, env as never);
+    const pending = (await (await app.request("/api/notebook/requests", { headers: ADMIN }, env as never)).json()) as unknown[];
+    expect(pending).toEqual([]); // the pending timeline request is now fulfilled
+  });
+
+  it("re-generating replaces the snapshot, not duplicates it", async () => {
+    await seedSeason();
+    await app.request("/api/notebook/generate/timeline", { method: "POST", headers: ADMIN }, env as never);
+    await app.request("/api/notebook/generate/timeline", { method: "POST", headers: ADMIN }, env as never);
+    const rows = (await (env.DB as { prepare: (s: string) => { all: () => Promise<{ results: unknown[] }> } })
+      .prepare("SELECT id FROM notebook_reports WHERE kind='timeline'")
+      .all()).results;
+    expect(rows.length).toBe(1);
+  });
 });
