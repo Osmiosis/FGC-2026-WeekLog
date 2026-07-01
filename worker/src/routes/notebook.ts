@@ -237,24 +237,44 @@ async function buildSeason(env: Env): Promise<SeasonExport> {
 
 notebook.get("/season", requireUser, async (c) => c.json(await buildSeason(c.env)));
 
+// Upsert the single snapshot row for a kind and fulfil that kind's pending
+// requests. Shared by the deterministic generate routes and the offline publish.
+async function saveReport(env: Env, kind: ReportKind, payload: unknown): Promise<void> {
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO notebook_reports (id, kind, generated_at, payload)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(kind) DO UPDATE SET id = excluded.id, generated_at = excluded.generated_at, payload = excluded.payload`
+  )
+    .bind(crypto.randomUUID(), kind, now, JSON.stringify(payload))
+    .run();
+  await env.DB.prepare(
+    "UPDATE notebook_requests SET status = 'fulfilled', fulfilled_at = ? WHERE kind = ? AND status = 'pending'"
+  )
+    .bind(now, kind)
+    .run();
+}
+
 // Admin-triggered: compute the timeline, upsert the single snapshot row for its
 // kind, and mark all pending timeline requests fulfilled in one shot.
 notebook.post("/generate/timeline", requireAdmin, async (c) => {
   const payload = await buildTimeline(c.env);
-  const now = new Date().toISOString();
-  await c.env.DB.prepare(
-    `INSERT INTO notebook_reports (id, kind, generated_at, payload)
-     VALUES (?, 'timeline', ?, ?)
-     ON CONFLICT(kind) DO UPDATE SET id = excluded.id, generated_at = excluded.generated_at, payload = excluded.payload`
-  )
-    .bind(crypto.randomUUID(), now, JSON.stringify(payload))
-    .run();
-  await c.env.DB.prepare(
-    "UPDATE notebook_requests SET status = 'fulfilled', fulfilled_at = ? WHERE kind = 'timeline' AND status = 'pending'"
-  )
-    .bind(now)
-    .run();
+  await saveReport(c.env, "timeline", payload);
   return c.json(payload);
 });
 
 notebook.get("/coverage", requireUser, async (c) => c.json(await buildCoverage(c.env)));
+
+// Offline write-back for reports authored by Claude Code (gaps, decisions,
+// scaffold). Gated by a shared secret, not user auth: it is machine-called by the
+// pipeline, never the browser. Accepts any kind so later reasoning tabs reuse it.
+notebook.post("/publish", async (c) => {
+  const secret = c.env.NOTEBOOK_PUBLISH_SECRET;
+  if (!secret) return c.json({ error: "publish not configured" }, 503);
+  if (c.req.header("X-Notebook-Secret") !== secret) return c.json({ error: "unauthorized" }, 401);
+  const body = await c.req.json<{ kind?: string; payload?: unknown }>();
+  if (!body.kind || !KINDS.includes(body.kind as ReportKind)) return c.json({ error: "unknown kind" }, 400);
+  if (body.payload === undefined || body.payload === null) return c.json({ error: "payload required" }, 400);
+  await saveReport(c.env, body.kind as ReportKind, body.payload);
+  return c.json({ ok: true });
+});

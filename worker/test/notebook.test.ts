@@ -149,4 +149,53 @@ describe("notebook prep", () => {
     expect(season.media[0].onMeetingDay).toBe(true);
     expect(season.media[0]).not.toHaveProperty("r2_key"); // metadata only, no bytes/keys
   });
+
+  const GAPS = { kind: "gaps", payload: { criteria: [{ criterion: "Trade-off analysis", status: "thin", finding: "Only 1 decision documented", suggestions: ["Write up the wheel change"] }] } };
+
+  it("publish is 503 when the secret is not configured", async () => {
+    const res = await app.request(
+      "/api/notebook/publish",
+      { method: "POST", headers: { "X-Notebook-Secret": "whatever", "Content-Type": "application/json" }, body: JSON.stringify(GAPS) },
+      env as never
+    );
+    expect(res.status).toBe(503);
+  });
+
+  it("publish rejects a missing or wrong secret", async () => {
+    env.NOTEBOOK_PUBLISH_SECRET = "s3cret";
+    const noHeader = await app.request(
+      "/api/notebook/publish",
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(GAPS) },
+      env as never
+    );
+    expect(noHeader.status).toBe(401);
+    const wrong = await app.request(
+      "/api/notebook/publish",
+      { method: "POST", headers: { "X-Notebook-Secret": "nope", "Content-Type": "application/json" }, body: JSON.stringify(GAPS) },
+      env as never
+    );
+    expect(wrong.status).toBe(401);
+  });
+
+  it("publish with the right secret upserts the report and fulfils pending requests", async () => {
+    env.NOTEBOOK_PUBLISH_SECRET = "s3cret";
+    await app.request(
+      "/api/notebook/requests",
+      { method: "POST", headers: MEMBER, body: JSON.stringify({ kind: "gaps" }) },
+      env as never
+    );
+    const res = await app.request(
+      "/api/notebook/publish",
+      { method: "POST", headers: { "X-Notebook-Secret": "s3cret", "Content-Type": "application/json" }, body: JSON.stringify(GAPS) },
+      env as never
+    );
+    expect(res.status).toBe(200);
+
+    const map = (await (await app.request("/api/notebook/reports", { headers: MEMBER }, env as never)).json()) as {
+      gaps?: { payload: { criteria: { criterion: string }[] } };
+    };
+    expect(map.gaps?.payload.criteria[0].criterion).toBe("Trade-off analysis");
+    const pending = (await (await app.request("/api/notebook/requests", { headers: ADMIN }, env as never)).json()) as unknown[];
+    expect(pending).toEqual([]); // gaps request fulfilled
+  });
 });
