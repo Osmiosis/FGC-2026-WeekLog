@@ -18,4 +18,22 @@ describe("GapsTab", () => {
     expect(screen.getByText("Write up the wheel change")).toBeTruthy();
     expect(screen.getByText("Design iteration photos")).toBeTruthy();
   });
+
+  it("renders a strong-status criterion's label and finding", () => {
+    const strongPayload: GapPayload = {
+      criteria: [
+        { criterion: "Attendance logging", status: "strong", finding: "Every meeting has attendance recorded", suggestions: [] },
+      ],
+    };
+    render(<GapsTab payload={strongPayload} />);
+    expect(screen.getByText("Attendance logging")).toBeTruthy();
+    expect(screen.getByText("Every meeting has attendance recorded")).toBeTruthy();
+    expect(screen.getByText("Strong")).toBeTruthy();
+  });
+
+  it("shows the empty-state message when criteria is empty", () => {
+    const emptyPayload: GapPayload = { criteria: [] };
+    render(<GapsTab payload={emptyPayload} />);
+    expect(screen.getByText("No criteria in this report.")).toBeTruthy();
+  });
 });

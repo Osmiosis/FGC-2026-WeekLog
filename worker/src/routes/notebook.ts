@@ -119,7 +119,8 @@ async function buildCoverage(env: Env): Promise<CoverageStats> {
   const subs = (
     await env.DB.prepare(
       `SELECT subsystem, kind, content, resolved FROM submissions
-       WHERE kind IN ('accomplishment','failure','build_need','performance_goal','note')`
+       WHERE kind IN ('accomplishment','failure','build_need','performance_goal','note')
+       ORDER BY subsystem`
     ).all<{ subsystem: string | null; kind: string; content: string | null; resolved: number }>()
   ).results;
 
@@ -155,6 +156,8 @@ async function buildCoverage(env: Env): Promise<CoverageStats> {
   for (const n of map.keys()) if (!ordered.includes(n)) ordered.push(n);
   const subsystems = ordered.map((n) => map.get(n)!);
 
+  // Counts all media rows (including deadline media), unlike the Timeline, which
+  // only joins media to meeting days.
   const media = (await env.DB.prepare("SELECT kind FROM media").all<{ kind: string | null }>()).results;
   const byKind: Record<string, number> = {};
   for (const m of media) {
@@ -272,7 +275,12 @@ notebook.post("/publish", async (c) => {
   const secret = c.env.NOTEBOOK_PUBLISH_SECRET;
   if (!secret) return c.json({ error: "publish not configured" }, 503);
   if (c.req.header("X-Notebook-Secret") !== secret) return c.json({ error: "unauthorized" }, 401);
-  const body = await c.req.json<{ kind?: string; payload?: unknown }>();
+  let body: { kind?: string; payload?: unknown };
+  try {
+    body = await c.req.json<{ kind?: string; payload?: unknown }>();
+  } catch {
+    return c.json({ error: "bad payload" }, 400);
+  }
   if (!body.kind || !KINDS.includes(body.kind as ReportKind)) return c.json({ error: "unknown kind" }, 400);
   if (body.payload === undefined || body.payload === null) return c.json({ error: "payload required" }, 400);
   await saveReport(c.env, body.kind as ReportKind, body.payload);

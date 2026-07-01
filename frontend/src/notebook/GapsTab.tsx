@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<GapStatus, string> = {
 };
 
 export function GapsTab({ payload }: { payload: GapPayload }) {
-  if (payload.criteria.length === 0) {
+  if (!Array.isArray(payload.criteria) || payload.criteria.length === 0) {
     return <p className="mono-label" style={{ color: "var(--fg-faint)" }}>No criteria in this report.</p>;
   }
   return (

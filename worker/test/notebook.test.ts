@@ -134,6 +134,34 @@ describe("notebook prep", () => {
     expect(cov.totals.failures).toBe(1);
   });
 
+  it("coverage reports meeting spread and resolved build-needs across days", async () => {
+    const dayId = await seedSeason();
+    await app.request(
+      "/api/meeting-days",
+      { method: "POST", headers: ADMIN, body: JSON.stringify({ date: "2026-07-14" }) },
+      env as never
+    );
+
+    const create = await app.request(
+      `/api/meeting-days/${dayId}/submissions`,
+      { method: "POST", headers: MEMBER, body: JSON.stringify({ kind: "build_need", subsystem: "Climber", content: "Need a spare motor" }) },
+      env as never
+    );
+    const subId = ((await create.json()) as { id: string }).id;
+    const resolve = await app.request(`/api/submissions/${subId}/resolve`, { method: "POST", headers: MEMBER }, env as never);
+    expect(resolve.status).toBe(200);
+
+    const res = await app.request("/api/notebook/coverage", { headers: MEMBER }, env as never);
+    expect(res.status).toBe(200);
+    const cov = (await res.json()) as {
+      subsystems: { name: string; buildNeedsResolved: number }[];
+      spread: { meetingCount: number; largestGapDays: number };
+    };
+    expect(cov.spread.meetingCount).toBe(2);
+    expect(cov.spread.largestGapDays).toBe(7);
+    expect(cov.subsystems.find((s) => s.name === "Climber")!.buildNeedsResolved).toBe(1);
+  });
+
   it("season export returns normalized data with media metadata only", async () => {
     await seedSeason();
     const res = await app.request("/api/notebook/season", { headers: MEMBER }, env as never);
