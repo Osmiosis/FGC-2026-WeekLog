@@ -52,6 +52,16 @@ export async function apiBlobUrl(path: string): Promise<string> {
   return URL.createObjectURL(await res.blob());
 }
 
+// Raw bytes for one authed GET (used by the client-side ZIP builder).
+export async function apiBytes(path: string): Promise<Uint8Array> {
+  const token = await getFreshToken();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+  if (!res.ok) throw new Error(`${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 export async function downloadAuthed(path: string, filename: string): Promise<void> {
   const url = await apiBlobUrl(path);
   const a = document.createElement("a");
