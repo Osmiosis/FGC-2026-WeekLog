@@ -8,21 +8,23 @@ import { DeadlinesView } from "./deadlines/DeadlinesView";
 import { BrowseView } from "./browse/BrowseView";
 import { MembersAdmin } from "./admin/MembersAdmin";
 import { TemplatesAdmin } from "./admin/TemplatesAdmin";
+import { NotebookView } from "./notebook/NotebookView";
 import { Icon, type IconName } from "./ui/Icon";
 import { Brand, useWide } from "./ui/primitives";
 
-type Tab = "dashboard" | "calendar" | "deadlines" | "browse" | "members" | "templates";
+type Tab = "dashboard" | "calendar" | "deadlines" | "browse" | "notebook" | "members" | "templates";
 
-// Desktop sidebar shows all of MAIN; the mobile bottom bar shows only BAR (Members overflows to "More").
+// Desktop sidebar shows all of MAIN; the mobile bottom bar shows only BAR (Notebook + Members overflow to "More").
 const MAIN: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: "dashboard", label: "Dashboard", icon: "grid" },
   { id: "calendar", label: "Calendar", icon: "calendar" },
   { id: "deadlines", label: "Deadlines", icon: "flag" },
   { id: "browse", label: "Browse", icon: "search" },
+  { id: "notebook", label: "Notebook", icon: "list" },
   { id: "members", label: "Members", icon: "users" },
 ];
 const BAR = MAIN.slice(0, 4);
-const MEMBERS_TAB = MAIN[4];
+const OVERFLOW = MAIN.slice(4); // notebook + members, shown in the mobile More sheet
 const ADMIN: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: "templates", label: "Requirements", icon: "list" },
 ];
@@ -32,6 +34,7 @@ const TITLE: Record<Tab, string> = {
   calendar: "Meeting days",
   deadlines: "Deadlines",
   browse: "Find anything",
+  notebook: "Notebook prep",
   members: "Members",
   templates: "Requirements",
 };
@@ -60,6 +63,7 @@ function Shell() {
       {tab === "calendar" && <CalendarView initialOpenDayId={calendarDayId} />}
       {tab === "deadlines" && <DeadlinesView wide={wide} />}
       {tab === "browse" && <BrowseView onOpenDay={openDay} wide={wide} />}
+      {tab === "notebook" && <NotebookView />}
       {tab === "members" && <MembersAdmin readOnly={!isAdmin} />}
       {tab === "templates" && isAdmin && <TemplatesAdmin />}
     </div>
@@ -126,7 +130,7 @@ function Shell() {
             <div className="grab" />
             <p className="eyebrow"><span className="dot">/ </span>Menu</p>
             <div style={{ display: "grid", gap: 6, margin: "14px 0 18px" }}>
-              {[MEMBERS_TAB, ...(isAdmin ? ADMIN : [])].map((t) => (
+              {[...OVERFLOW, ...(isAdmin ? ADMIN : [])].map((t) => (
                 <button key={t.id} className="roster-chip" style={{ background: "var(--ink)" }} onClick={() => go(t.id)}>
                   <Icon name={t.icon} size={18} /> <span style={{ fontWeight: 600 }}>{t.label}</span>
                 </button>
