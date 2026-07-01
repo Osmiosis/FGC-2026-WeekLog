@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env, Variables } from "../bindings";
 import { requireUser, requireAdmin } from "../auth";
-import type { NotebookReportsMap, NotebookReport, ReportKind, TimelinePayload, TimelineEntry, CoverageStats, CoverageSubsystem } from "@weeklog/types";
+import type { NotebookReportsMap, NotebookReport, ReportKind, TimelinePayload, TimelineEntry, CoverageStats, CoverageSubsystem, SeasonExport } from "@weeklog/types";
 
 // Notebook Prep API (mounted at /api/notebook).
 export const notebook = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -180,6 +180,62 @@ async function buildCoverage(env: Env): Promise<CoverageStats> {
     totals: { submissions: subs.length, failures: totalFailures, numericEntries: totalNumeric },
   };
 }
+
+// Normalized season dump for the offline reasoning pipeline. Media is metadata
+// only (caption, kind, date) so no image bytes ever reach a reasoning step.
+async function buildSeason(env: Env): Promise<SeasonExport> {
+  const meetingDays = (
+    await env.DB.prepare("SELECT id, date, title FROM meeting_days ORDER BY date").all<{ id: string; date: string; title: string | null }>()
+  ).results;
+
+  const submissions = (
+    await env.DB.prepare(
+      `SELECT md.date, s.subsystem, s.kind, s.content, s.created_by
+       FROM submissions s JOIN meeting_days md ON md.id = s.meeting_day_id
+       ORDER BY md.date, s.created_at`
+    ).all<{ date: string; subsystem: string | null; kind: string; content: string | null; created_by: string | null }>()
+  ).results;
+
+  const att = (
+    await env.DB.prepare(
+      `SELECT md.date, m.name FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       JOIN meeting_days md ON md.id = a.meeting_day_id
+       WHERE a.present = 1 ORDER BY md.date, m.name`
+    ).all<{ date: string; name: string }>()
+  ).results;
+  const attByDate = new Map<string, string[]>();
+  for (const r of att) {
+    const l = attByDate.get(r.date);
+    if (l) l.push(r.name);
+    else attByDate.set(r.date, [r.name]);
+  }
+  const attendance = [...attByDate.entries()].map(([date, present]) => ({ date, present }));
+
+  const deadlines = (
+    await env.DB.prepare(
+      "SELECT title, description, category, due_date, status FROM deadlines ORDER BY due_date"
+    ).all<{ title: string; description: string | null; category: string | null; due_date: string; status: string | null }>()
+  ).results;
+
+  const mediaRows = (
+    await env.DB.prepare(
+      `SELECT m.subsystem, m.caption, m.kind, md.date AS mdate, m.meeting_day_id
+       FROM media m LEFT JOIN meeting_days md ON md.id = m.meeting_day_id`
+    ).all<{ subsystem: string | null; caption: string | null; kind: string | null; mdate: string | null; meeting_day_id: string | null }>()
+  ).results;
+  const media = mediaRows.map((m) => ({
+    date: m.mdate,
+    subsystem: m.subsystem,
+    caption: m.caption,
+    kind: m.kind,
+    onMeetingDay: m.meeting_day_id != null,
+  }));
+
+  return { meetingDays, submissions, attendance, deadlines, media };
+}
+
+notebook.get("/season", requireUser, async (c) => c.json(await buildSeason(c.env)));
 
 // Admin-triggered: compute the timeline, upsert the single snapshot row for its
 // kind, and mark all pending timeline requests fulfilled in one shot.

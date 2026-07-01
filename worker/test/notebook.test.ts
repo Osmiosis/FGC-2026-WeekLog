@@ -133,4 +133,20 @@ describe("notebook prep", () => {
     expect(cov.photos.total).toBe(1);
     expect(cov.totals.failures).toBe(1);
   });
+
+  it("season export returns normalized data with media metadata only", async () => {
+    await seedSeason();
+    const res = await app.request("/api/notebook/season", { headers: MEMBER }, env as never);
+    expect(res.status).toBe(200);
+    const season = (await res.json()) as {
+      meetingDays: { date: string }[];
+      submissions: { date: string; kind: string; content: string | null }[];
+      media: { caption: string | null; kind: string | null; onMeetingDay: boolean }[];
+    };
+    expect(season.meetingDays.some((d) => d.date === "2026-07-07")).toBe(true);
+    expect(season.submissions.some((s) => s.content === "Shooter tuned")).toBe(true); // verbatim
+    expect(season.media.length).toBe(1);
+    expect(season.media[0].onMeetingDay).toBe(true);
+    expect(season.media[0]).not.toHaveProperty("r2_key"); // metadata only, no bytes/keys
+  });
 });
