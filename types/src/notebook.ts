@@ -34,8 +34,46 @@ export interface TimelinePayload {
   photosByDate: TimelinePhotoDay[];
 }
 
+// Gap analysis (AI-authored offline, published via /publish). Renders as RAG cards.
+export type GapStatus = "strong" | "thin" | "missing";
+export interface GapCriterion {
+  criterion: string; // e.g. "Trade-off analysis"
+  status: GapStatus; // strong=green, thin=amber, missing=red
+  finding: string; // short, plain-language
+  suggestions: string[]; // concrete prompts for a human, never written content
+  evidence_refs?: { date: string; subsystem: string }[];
+}
+export interface GapPayload {
+  criteria: GapCriterion[];
+}
+
+// Deterministic coverage stats (Worker-computed) that the reasoning interprets.
+export interface CoverageSubsystem {
+  name: string;
+  entries: number;
+  failures: number;
+  buildNeedsOpen: number;
+  buildNeedsResolved: number;
+  numericEntries: number; // entries whose content contains a digit
+}
+export interface CoverageStats {
+  subsystems: CoverageSubsystem[];
+  photos: { total: number; byKind: Record<string, number> };
+  spread: { firstDate: string | null; lastDate: string | null; meetingCount: number; largestGapDays: number };
+  totals: { submissions: number; failures: number; numericEntries: number };
+}
+
+// Normalized season dump the pipeline reads. Media is metadata only, no bytes.
+export interface SeasonExport {
+  meetingDays: { id: string; date: string; title: string | null }[];
+  submissions: { date: string; subsystem: string | null; kind: string; content: string | null; created_by: string | null }[];
+  attendance: { date: string; present: string[] }[];
+  deadlines: { title: string; description: string | null; category: string | null; due_date: string; status: string | null }[];
+  media: { date: string | null; subsystem: string | null; caption: string | null; kind: string | null; onMeetingDay: boolean }[];
+}
+
 // Widens as later report kinds land (gaps, decisions, scaffold).
-export type ReportPayload = TimelinePayload;
+export type ReportPayload = TimelinePayload | GapPayload;
 
 export interface NotebookReport {
   id: string;
