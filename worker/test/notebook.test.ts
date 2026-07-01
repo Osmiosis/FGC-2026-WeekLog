@@ -107,4 +107,30 @@ describe("notebook prep", () => {
       .all()).results;
     expect(rows.length).toBe(1);
   });
+
+  it("coverage counts entries, failures, build-needs, numerics, and photos", async () => {
+    const dayId = await seedSeason();
+    // A numeric build-need on Shooter (open by default).
+    await app.request(
+      `/api/meeting-days/${dayId}/submissions`,
+      { method: "POST", headers: MEMBER, body: JSON.stringify({ kind: "build_need", subsystem: "Shooter", content: "Need 4 more 80mm wheels" }) },
+      env as never
+    );
+
+    const res = await app.request("/api/notebook/coverage", { headers: MEMBER }, env as never);
+    expect(res.status).toBe(200);
+    const cov = (await res.json()) as {
+      subsystems: { name: string; entries: number; failures: number; buildNeedsOpen: number; numericEntries: number }[];
+      photos: { total: number; byKind: Record<string, number> };
+      totals: { submissions: number; failures: number; numericEntries: number };
+    };
+    const shooter = cov.subsystems.find((s) => s.name === "Shooter")!;
+    expect(shooter.entries).toBe(2); // accomplishment + build_need
+    expect(shooter.buildNeedsOpen).toBe(1);
+    expect(shooter.numericEntries).toBe(1); // "Need 4 more..." contains a digit
+    expect(cov.subsystems.find((s) => s.name === "Climber")!.failures).toBe(1);
+    expect(cov.subsystems.some((s) => s.name === "Uncategorized")).toBe(true); // the null-subsystem note
+    expect(cov.photos.total).toBe(1);
+    expect(cov.totals.failures).toBe(1);
+  });
 });

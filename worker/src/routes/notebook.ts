@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env, Variables } from "../bindings";
 import { requireUser, requireAdmin } from "../auth";
-import type { NotebookReportsMap, NotebookReport, ReportKind, TimelinePayload, TimelineEntry } from "@weeklog/types";
+import type { NotebookReportsMap, NotebookReport, ReportKind, TimelinePayload, TimelineEntry, CoverageStats, CoverageSubsystem } from "@weeklog/types";
 
 // Notebook Prep API (mounted at /api/notebook).
 export const notebook = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -109,6 +109,78 @@ async function buildTimeline(env: Env): Promise<TimelinePayload> {
   return { subsystems, photosByDate };
 }
 
+// Deterministic coverage numbers the reasoning step interprets. Never invented:
+// straight counts over the logged submissions and media.
+async function buildCoverage(env: Env): Promise<CoverageStats> {
+  const committees = (
+    await env.DB.prepare("SELECT name FROM committees ORDER BY sort_order, name").all<{ name: string }>()
+  ).results.map((r) => r.name);
+
+  const subs = (
+    await env.DB.prepare(
+      `SELECT subsystem, kind, content, resolved FROM submissions
+       WHERE kind IN ('accomplishment','failure','build_need','performance_goal','note')`
+    ).all<{ subsystem: string | null; kind: string; content: string | null; resolved: number }>()
+  ).results;
+
+  const map = new Map<string, CoverageSubsystem>();
+  const ensure = (name: string) => {
+    let x = map.get(name);
+    if (!x) {
+      x = { name, entries: 0, failures: 0, buildNeedsOpen: 0, buildNeedsResolved: 0, numericEntries: 0 };
+      map.set(name, x);
+    }
+    return x;
+  };
+  let totalFailures = 0;
+  let totalNumeric = 0;
+  for (const s of subs) {
+    const x = ensure(s.subsystem ?? "Uncategorized");
+    x.entries++;
+    if (s.kind === "failure") {
+      x.failures++;
+      totalFailures++;
+    }
+    if (s.kind === "build_need") {
+      if (s.resolved) x.buildNeedsResolved++;
+      else x.buildNeedsOpen++;
+    }
+    if (s.content && /\d/.test(s.content)) {
+      x.numericEntries++;
+      totalNumeric++;
+    }
+  }
+  const ordered: string[] = [];
+  for (const n of committees) if (map.has(n)) ordered.push(n);
+  for (const n of map.keys()) if (!ordered.includes(n)) ordered.push(n);
+  const subsystems = ordered.map((n) => map.get(n)!);
+
+  const media = (await env.DB.prepare("SELECT kind FROM media").all<{ kind: string | null }>()).results;
+  const byKind: Record<string, number> = {};
+  for (const m of media) {
+    const k = m.kind ?? "unknown";
+    byKind[k] = (byKind[k] ?? 0) + 1;
+  }
+
+  const days = (
+    await env.DB.prepare("SELECT date FROM meeting_days ORDER BY date").all<{ date: string }>()
+  ).results.map((r) => r.date);
+  let largestGapDays = 0;
+  for (let i = 1; i < days.length; i++) {
+    const d0 = new Date(days[i - 1] + "T00:00:00Z").getTime();
+    const d1 = new Date(days[i] + "T00:00:00Z").getTime();
+    const gap = Math.round((d1 - d0) / 86400000);
+    if (gap > largestGapDays) largestGapDays = gap;
+  }
+
+  return {
+    subsystems,
+    photos: { total: media.length, byKind },
+    spread: { firstDate: days[0] ?? null, lastDate: days[days.length - 1] ?? null, meetingCount: days.length, largestGapDays },
+    totals: { submissions: subs.length, failures: totalFailures, numericEntries: totalNumeric },
+  };
+}
+
 // Admin-triggered: compute the timeline, upsert the single snapshot row for its
 // kind, and mark all pending timeline requests fulfilled in one shot.
 notebook.post("/generate/timeline", requireAdmin, async (c) => {
@@ -128,3 +200,5 @@ notebook.post("/generate/timeline", requireAdmin, async (c) => {
     .run();
   return c.json(payload);
 });
+
+notebook.get("/coverage", requireUser, async (c) => c.json(await buildCoverage(c.env)));
