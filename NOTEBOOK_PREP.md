@@ -51,3 +51,22 @@ numbers, and the output is never a submittable notebook. No em dashes.
 
 Rules: same as the Gaps report. No invented facts or numbers, output is never a submittable notebook,
 no em dashes.
+
+## Scaffold report
+
+1. Fetch the inputs (public reads, no auth): `GET {BASE}/api/notebook/season`. Also read the already
+   published gaps and decisions from `GET {BASE}/api/notebook/reports` for context.
+2. Read `PRD'S/FGC_NOTEBOOK_REFERENCE_BRIEF.md` so the section structure follows what judges expect.
+3. Produce a `ScaffoldPayload`: a notebook SKELETON with `sections` keyed by subsystem or
+   design-process stage. For each section, `raw_material` is the team's OWN logged words, verbatim
+   (never rewritten), and `needs` is a list of prompts marking every place a human must add
+   reasoning, math, or narrative (phrased as questions, never answered). `draft_notice` is the fixed
+   NOT FOR SUBMISSION text. Never invent content and never write the notebook prose.
+   Shape:
+   `{ "draft_notice": "DRAFT. NOT FOR SUBMISSION. The team writes the notebook.", "sections": [ { "heading": "Drivetrain", "raw_material": ["Went with 4-wheel drivetrain (2 omni front, 2 traction back)"], "needs": ["Why did 4-wheel win over 6-wheel?", "What were the numbers behind the choice?"] } ] }`
+4. Publish it: `POST {BASE}/api/notebook/publish`, header `X-Notebook-Secret: {the secret}`, body
+   `{ "kind": "scaffold", "payload": { ...the ScaffoldPayload... } }`. A 200 means the Scaffold tab
+   now shows the DRAFT worksheet and pending scaffold requests are marked fulfilled.
+
+Rules: same as the other reports. Raw material stays verbatim, needs only flag and ask, no invented
+facts or numbers, the output is never a submittable notebook, no em dashes.
