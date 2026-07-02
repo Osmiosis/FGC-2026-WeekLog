@@ -14,3 +14,6 @@ dist/
 # design handoff drop (kept out of the repo)
 .design-handoff/
 FGC-Log-Frontend.zip
+
+# Notebook Prep publish secret, read by the runbook at publish time (never committed)
+.notebook-secret
