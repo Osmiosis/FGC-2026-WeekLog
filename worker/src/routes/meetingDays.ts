@@ -8,10 +8,11 @@ import {
   dayStatusFromDerived,
   todayUTC,
 } from "../dayStatus";
-import { zipSync, strToU8 } from "fflate";
+import { strToU8 } from "fflate";
 import { buildDaySummary } from "../summary";
 import { checkStorageBudget } from "../storage";
 import { cleanFileName, uniquePath } from "../names";
+import { streamZip, type ZipEntry } from "../zipStream";
 
 export const meetingDays = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -435,22 +436,17 @@ meetingDays.get("/:id/zip", requireUser, async (c) => {
   const summary = await buildDaySummary(c.env, id);
   if (!summary) return c.json({ error: "not found" }, 404);
 
-  const files: Record<string, Uint8Array> = {
-    "summary.md": strToU8(summary.markdown),
-    "summary.json": strToU8(JSON.stringify(summary.json, null, 2)),
-  };
+  // Build the entry manifest, then stream — media bytes are pulled one at a time
+  // so a media-heavy day never buffers the whole archive in memory (see streamZip).
+  const used: Record<string, true> = {};
+  const entries: ZipEntry[] = [
+    { path: "summary.md", bytes: strToU8(summary.markdown) },
+    { path: "summary.json", bytes: strToU8(JSON.stringify(summary.json, null, 2)) },
+  ];
   for (const m of summary.mediaRows) {
-    const obj = await c.env.MEDIA.get(m.r2_key);
-    if (obj) {
-      const path = uniquePath(files, `media/${cleanFileName(m.r2_key)}`);
-      files[path] = new Uint8Array(await obj.arrayBuffer());
-    }
+    const path = uniquePath(used, `media/${cleanFileName(m.r2_key)}`);
+    used[path] = true;
+    entries.push({ path, r2Key: m.r2_key });
   }
-  const zipped = zipSync(files, { level: 0 });
-  return new Response(zipped, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="meeting-${id}.zip"`,
-    },
-  });
+  return streamZip(c.env, entries, `meeting-${id}.zip`);
 });

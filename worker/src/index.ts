@@ -13,6 +13,7 @@ import { dashboard } from "./routes/dashboard";
 import { search, buildNeeds } from "./routes/search";
 import { exports } from "./routes/exports";
 import { driveRoutes } from "./routes/drive";
+import { notebook } from "./routes/notebook";
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -48,6 +49,7 @@ app.route("/api/search", search);
 app.route("/api/build-needs", buildNeeds);
 app.route("/api/export", exports);
 app.route("/api/drive", driveRoutes);
+app.route("/api/notebook", notebook);
 
 // Surface the real error: log the stack (visible via `wrangler tail`) and return
 // the message instead of an opaque "Internal Server Error".

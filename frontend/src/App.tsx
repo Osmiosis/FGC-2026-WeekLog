@@ -8,22 +8,24 @@ import { DeadlinesView } from "./deadlines/DeadlinesView";
 import { BrowseView } from "./browse/BrowseView";
 import { MembersAdmin } from "./admin/MembersAdmin";
 import { TemplatesAdmin } from "./admin/TemplatesAdmin";
+import { NotebookView } from "./notebook/NotebookView";
 import { Icon, type IconName } from "./ui/Icon";
 import { Brand, useWide } from "./ui/primitives";
 import { DemoBadge } from "./ui/DemoBadge";
 
-type Tab = "dashboard" | "calendar" | "deadlines" | "browse" | "members" | "templates";
+type Tab = "dashboard" | "calendar" | "deadlines" | "browse" | "notebook" | "members" | "templates";
 
-// Desktop sidebar shows all of MAIN; the mobile bottom bar shows only BAR (Members overflows to "More").
+// Desktop sidebar shows all of MAIN; the mobile bottom bar shows only BAR (Notebook + Members overflow to "More").
 const MAIN: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: "dashboard", label: "Dashboard", icon: "grid" },
   { id: "calendar", label: "Calendar", icon: "calendar" },
   { id: "deadlines", label: "Deadlines", icon: "flag" },
   { id: "browse", label: "Browse", icon: "search" },
+  { id: "notebook", label: "Notebook", icon: "list" },
   { id: "members", label: "Members", icon: "users" },
 ];
 const BAR = MAIN.slice(0, 4);
-const MEMBERS_TAB = MAIN[4];
+const OVERFLOW = MAIN.slice(4); // notebook + members, shown in the mobile More sheet
 const ADMIN: Array<{ id: Tab; label: string; icon: IconName }> = [
   { id: "templates", label: "Requirements", icon: "list" },
 ];
@@ -33,6 +35,7 @@ const TITLE: Record<Tab, string> = {
   calendar: "Meeting days",
   deadlines: "Deadlines",
   browse: "Find anything",
+  notebook: "Notebook prep",
   members: "Members",
   templates: "Requirements",
 };
@@ -43,12 +46,15 @@ function Shell() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [calendarDayId, setCalendarDayId] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
 
   const openDay = (id: string) => { setCalendarDayId(id); setTab("calendar"); };
   const go = (t: Tab) => { setCalendarDayId(null); setTab(t); setMore(false); };
 
   if (loading) return <div className="tq" style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}><p className="mono-label">Loading...</p></div>;
-  if (!session) return <Login />;
+  // Open access: no login wall. The app is public; admins sign in on demand to
+  // unlock admin controls. The overlay auto-dismisses once isAdmin flips true.
+  if (showLogin && !isAdmin) return <Login onBack={() => setShowLogin(false)} />;
 
   const labelFor = (t: Tab) => MAIN.concat(ADMIN).find((x) => x.id === t)?.label ?? "";
 
@@ -58,6 +64,7 @@ function Shell() {
       {tab === "calendar" && <CalendarView initialOpenDayId={calendarDayId} />}
       {tab === "deadlines" && <DeadlinesView wide={wide} />}
       {tab === "browse" && <BrowseView onOpenDay={openDay} wide={wide} />}
+      {tab === "notebook" && <NotebookView />}
       {tab === "members" && <MembersAdmin readOnly={!isAdmin} />}
       {tab === "templates" && isAdmin && <TemplatesAdmin />}
     </div>
@@ -75,13 +82,19 @@ function Shell() {
             <div className="mono-label" style={{ fontSize: 9, padding: "20px 12px 8px", color: "var(--fg-faint)" }}>/ Admin</div>
             <nav style={{ display: "grid", gap: 3 }}>{ADMIN.map((t) => <NavItem key={t.id} t={t} active={tab === t.id} onClick={() => go(t.id)} />)}</nav>
           </>}
-          <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 50, background: "var(--maroon)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, flex: "none" }}>{(email ?? "?").slice(0, 2).toUpperCase()}</div>
-            <div style={{ lineHeight: 1.2, overflow: "hidden", flex: 1 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
-              <div className="mono-label" style={{ fontSize: 9 }}>{isAdmin ? "Admin" : "Member"}</div>
-            </div>
-            <button className="btn btn-ghost btn-sm" style={{ width: 34, padding: 0, justifyContent: "center" }} onClick={signOut} title="Sign out"><Icon name="arrow" size={15} style={{ transform: "rotate(180deg)" }} /></button>
+          <div style={{ marginTop: "auto", borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+            {isAdmin ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 50, background: "var(--maroon)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, flex: "none" }}>{(email ?? "?").slice(0, 2).toUpperCase()}</div>
+                <div style={{ lineHeight: 1.2, overflow: "hidden", flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
+                  <div className="mono-label" style={{ fontSize: 9 }}>Admin</div>
+                </div>
+                <button className="btn btn-ghost btn-sm" style={{ width: 34, padding: 0, justifyContent: "center" }} onClick={signOut} title="Sign out"><Icon name="arrow" size={15} style={{ transform: "rotate(180deg)" }} /></button>
+              </div>
+            ) : (
+              <button className="btn btn-ghost btn-sm" style={{ width: "100%" }} onClick={() => setShowLogin(true)}>Admin sign in</button>
+            )}
           </div>
         </aside>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -110,7 +123,7 @@ function Shell() {
 
       <nav style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", alignItems: "center", padding: "8px 8px calc(8px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--line)", background: "var(--ink-1)" }}>
         {BAR.map((t) => <TabBtn key={t.id} t={t} active={tab === t.id} onClick={() => go(t.id)} />)}
-        <TabBtn t={{ label: "More", icon: "list" }} active={more || tab === "members"} onClick={() => setMore(true)} />
+        <TabBtn t={{ label: "More", icon: "list" }} active={more || OVERFLOW.some((t) => t.id === tab)} onClick={() => setMore(true)} />
       </nav>
 
       {more && (
@@ -120,18 +133,24 @@ function Shell() {
             <div className="grab" />
             <p className="eyebrow"><span className="dot">/ </span>Menu</p>
             <div style={{ display: "grid", gap: 6, margin: "14px 0 18px" }}>
-              {[MEMBERS_TAB, ...(isAdmin ? ADMIN : [])].map((t) => (
+              {[...OVERFLOW, ...(isAdmin ? ADMIN : [])].map((t) => (
                 <button key={t.id} className="roster-chip" style={{ background: "var(--ink)" }} onClick={() => go(t.id)}>
                   <Icon name={t.icon} size={18} /> <span style={{ fontWeight: 600 }}>{t.label}</span>
                 </button>
               ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderTop: "1px solid var(--line)" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
-                <div className="mono-label" style={{ fontSize: 9 }}>{isAdmin ? "Admin" : "Member"}</div>
-              </div>
-              <button className="btn btn-sm" onClick={signOut}>Sign out</button>
+              {isAdmin ? (
+                <>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
+                    <div className="mono-label" style={{ fontSize: 9 }}>Admin</div>
+                  </div>
+                  <button className="btn btn-sm" onClick={signOut}>Sign out</button>
+                </>
+              ) : (
+                <button className="btn btn-sm" style={{ flex: 1 }} onClick={() => { setMore(false); setShowLogin(true); }}>Admin sign in</button>
+              )}
             </div>
           </div>
         </>

@@ -10,6 +10,8 @@ export interface Env {
   DRIVE_FOLDER_ID?: string;
   // Allowed browser origin for CORS (the deployed Pages URL). Defaults to "*".
   FRONTEND_ORIGIN?: string;
+  // Shared secret for the offline pipeline's write-back to /api/notebook/publish.
+  NOTEBOOK_PUBLISH_SECRET?: string;
 }
 
 export interface AuthUser {

@@ -10,18 +10,20 @@ describe("auth + /api/me", () => {
     env = testEnv(makeTestDb());
   });
 
-  it("rejects requests with no token", async () => {
+  it("treats requests with no token as an anonymous member", async () => {
     const res = await app.request("/api/me", {}, env as never);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ email: "", isAdmin: false });
   });
 
-  it("rejects an invalid token", async () => {
+  it("treats an invalid token as an anonymous member", async () => {
     const res = await app.request(
       "/api/me",
       { headers: { Authorization: "Bearer garbage" } },
       env as never
     );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ email: "", isAdmin: false });
   });
 
   it("identifies the admin", async () => {

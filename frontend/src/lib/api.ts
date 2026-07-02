@@ -27,6 +27,15 @@ export async function apiBlobUrl(path: string): Promise<string> {
   return urlFor(match[1]);
 }
 
+// Raw bytes for one authed GET (used by the client-side ZIP builder on the real
+// app). In the demo there is no Worker; resolve the in-browser blob and read its
+// bytes so any client-zip caller still works without a backend.
+export async function apiBytes(path: string): Promise<Uint8Array> {
+  const url = await apiBlobUrl(path);
+  const res = await fetch(url);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 // "Download" endpoints (ZIP). In the demo we generate a small text manifest so the
 // button works without a backend, rather than zipping real binaries.
 export async function downloadAuthed(path: string, filename: string): Promise<void> {
