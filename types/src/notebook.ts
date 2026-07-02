@@ -61,6 +61,18 @@ export interface DecisionPayload {
   decisions: Decision[];
 }
 
+// Scaffold worksheet (AI-authored offline, published via /publish). Renders as a
+// DRAFT outline: verbatim raw material plus [NEEDS: ...] slots. Never submittable.
+export interface ScaffoldSection {
+  heading: string;
+  raw_material: string[]; // the team's own logged words, verbatim
+  needs: string[]; // prompts for a human, rendered as [NEEDS: ...] slots
+}
+export interface ScaffoldPayload {
+  draft_notice: string; // fixed NOT FOR SUBMISSION text
+  sections: ScaffoldSection[];
+}
+
 // Deterministic coverage stats (Worker-computed) that the reasoning interprets.
 export interface CoverageSubsystem {
   name: string;
@@ -87,7 +99,7 @@ export interface SeasonExport {
 }
 
 // Widens as later report kinds land (gaps, decisions, scaffold).
-export type ReportPayload = TimelinePayload | GapPayload | DecisionPayload;
+export type ReportPayload = TimelinePayload | GapPayload | DecisionPayload | ScaffoldPayload;
 
 export interface NotebookReport {
   id: string;
