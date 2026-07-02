@@ -26,16 +26,16 @@ describe("NotebookView", () => {
     expect(screen.getByText(/No gap analysis yet/)).toBeTruthy();
   });
 
-  it("has an enabled, switchable Decisions tab", () => {
+  it("has all four tabs enabled and none disabled", () => {
     render(<NotebookView />);
-    const decisions = screen.getByRole("button", { name: "Decisions" }) as HTMLButtonElement;
-    expect(decisions.disabled).toBe(false);
-    fireEvent.click(decisions);
-    expect(screen.getByText(/No decision worksheet yet/)).toBeTruthy();
+    for (const name of ["Timeline", "Gaps", "Decisions", "Scaffold"]) {
+      expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(false);
+    }
   });
 
-  it("keeps Scaffold disabled (still coming soon)", () => {
+  it("switches to Scaffold and shows its empty state", () => {
     render(<NotebookView />);
-    expect((screen.getByRole("button", { name: "Scaffold" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Scaffold" }));
+    expect(screen.getByText(/No scaffold yet/)).toBeTruthy();
   });
 });
