@@ -31,3 +31,23 @@ the notebook: it flags gaps, structures raw material, and asks the questions a j
 
 Rules: no runtime LLM calls, no image bytes (photos are used by metadata only), no invented facts or
 numbers, and the output is never a submittable notebook. No em dashes.
+
+## Decisions report
+
+1. Fetch the inputs (public reads, no auth): `GET {BASE}/api/notebook/season` and, for context,
+   `GET {BASE}/api/notebook/coverage`.
+2. Read `PRD'S/FGC_NOTEBOOK_REFERENCE_BRIEF.md`. Decisions are the brief's section 2.3 (trade-off
+   analysis) and 2.4 (numeric justification) material.
+3. Scan the season for decision points: a change of approach, a rejected option, a redesign. Produce
+   a `DecisionPayload`. For each decision, `title` and `chosen` come from the logged data; `missing`
+   lists which of `why` / `numbers` / `alternatives` / `result` are absent; `prompt` tells the team
+   what to add. Add `date` and `subsystem` when the logged entry has them. Never invent the reason,
+   the numbers, or the result. Where they are missing, that is the point of the flag.
+   Shape:
+   `{ "decisions": [ { "title": "Switched 6-wheel to 4-wheel drivetrain", "date": "2026-06-17", "subsystem": "Drivetrain/Collector", "chosen": "Went with 4-wheel", "missing": ["why","numbers"], "prompt": "Explain why 4-wheel won and the numbers behind it" } ] }`
+4. Publish it: `POST {BASE}/api/notebook/publish`, header `X-Notebook-Secret: {the secret}`, body
+   `{ "kind": "decisions", "payload": { ...the DecisionPayload... } }`. A 200 means the Decisions tab
+   now shows the checklist and pending decisions requests are marked fulfilled.
+
+Rules: same as the Gaps report. No invented facts or numbers, output is never a submittable notebook,
+no em dashes.
