@@ -1,41 +1,24 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-
-vi.mock("../auth/AuthProvider", () => ({ useAuth: () => ({ isAdmin: false, email: null }) }));
-vi.mock("../lib/hooks/useNotebook", () => ({
-  useNotebook: () => ({
-    timeline: null,
-    reports: {},
-    pending: [],
-    error: null,
-    busy: false,
-    generateTimeline: vi.fn(),
-    requestRefresh: vi.fn(),
-  }),
-}));
-
 import { NotebookView } from "./NotebookView";
 
-describe("NotebookView", () => {
-  it("shows the banner and an enabled, switchable Gaps tab", () => {
+// DEMO behavior: tabs start locked; a simulated Generate reveals seeded reports.
+describe("NotebookView (demo)", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("starts locked with generate controls and the sample-data explainer", () => {
     render(<NotebookView />);
     expect(screen.getByText(/Not a notebook/)).toBeTruthy();
-    const gaps = screen.getByRole("button", { name: "Gaps" }) as HTMLButtonElement;
-    expect(gaps.disabled).toBe(false);
-    fireEvent.click(gaps);
-    expect(screen.getByText(/No gap analysis yet/)).toBeTruthy();
+    expect(screen.getByText(/not a live AI call/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate Timeline" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate reasoning reports" })).toBeTruthy();
+    // Timeline is the default tab and starts locked.
+    expect(screen.getByText(/^Locked\./)).toBeTruthy();
   });
 
-  it("has all four tabs enabled and none disabled", () => {
+  it("shows an honest simulating label when a generate is clicked", () => {
     render(<NotebookView />);
-    for (const name of ["Timeline", "Gaps", "Decisions", "Scaffold"]) {
-      expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(false);
-    }
-  });
-
-  it("switches to Scaffold and shows its empty state", () => {
-    render(<NotebookView />);
-    fireEvent.click(screen.getByRole("button", { name: "Scaffold" }));
-    expect(screen.getByText(/No scaffold yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Generate Timeline" }));
+    expect(screen.getByText(/not a real AI call/)).toBeTruthy();
   });
 });

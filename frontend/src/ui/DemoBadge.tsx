@@ -2,11 +2,13 @@
 // Fixed "DEMO" pill with a reset action. Clearing the store and reloading
 // restores the seeded sample data.
 import { reset } from "../lib/demo/store";
+import { resetReveal } from "../lib/demo/notebookReveal";
 
 export function DemoBadge() {
   const onReset = () => {
     if (!confirm("Reset the demo to its original sample data? Your changes in this browser will be cleared.")) return;
     reset();
+    resetReveal(); // re-lock the Notebook Prep tabs to their pre-generate state
     location.reload();
   };
   return (
