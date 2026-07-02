@@ -34,7 +34,7 @@ export function NotebookView() {
     <div>
       <div className="card card-pad" style={{ borderLeft: "3px solid var(--maroon-bright)", marginBottom: 18 }}>
         <p className="mono-label" style={{ lineHeight: 1.6 }}>
-          Draft raw material and audit for the team's engineering notebook. Not a notebook. The team writes the notebook.
+          Draft raw material and audit for the team's engineering notebook. Not a notebook.
         </p>
       </div>
 

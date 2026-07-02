@@ -1,6 +1,6 @@
 import type { ScaffoldPayload } from "@weeklog/types";
 
-const DEFAULT_NOTICE = "DRAFT. NOT FOR SUBMISSION. The team writes the notebook.";
+const DEFAULT_NOTICE = "DRAFT. NOT FOR SUBMISSION.";
 
 // Assemble the scaffold into raw markdown for transfer into the real notebook doc.
 function toMarkdown(payload: ScaffoldPayload): string {

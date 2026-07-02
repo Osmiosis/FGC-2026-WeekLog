@@ -19,7 +19,7 @@ import { NotebookView } from "./NotebookView";
 describe("NotebookView", () => {
   it("shows the banner and an enabled, switchable Gaps tab", () => {
     render(<NotebookView />);
-    expect(screen.getByText(/The team writes the notebook/)).toBeTruthy();
+    expect(screen.getByText(/Not a notebook/)).toBeTruthy();
     const gaps = screen.getByRole("button", { name: "Gaps" }) as HTMLButtonElement;
     expect(gaps.disabled).toBe(false);
     fireEvent.click(gaps);
