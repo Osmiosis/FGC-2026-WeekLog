@@ -3,8 +3,9 @@ import { useNotebook } from "../lib/hooks/useNotebook";
 import { useAuth } from "../auth/AuthProvider";
 import { TimelineTab } from "./TimelineTab";
 import { GapsTab } from "./GapsTab";
+import { DecisionsTab } from "./DecisionsTab";
 import { fmtDate } from "../ui/primitives";
-import type { GapPayload } from "@weeklog/types";
+import type { GapPayload, DecisionPayload } from "@weeklog/types";
 
 type NbTab = "timeline" | "gaps" | "decisions" | "scaffold";
 // deterministic tabs get an in-app Generate button; reasoning tabs refresh via
@@ -12,7 +13,7 @@ type NbTab = "timeline" | "gaps" | "decisions" | "scaffold";
 const TABS: { id: NbTab; label: string; ready: boolean; deterministic: boolean }[] = [
   { id: "timeline", label: "Timeline", ready: true, deterministic: true },
   { id: "gaps", label: "Gaps", ready: true, deterministic: false },
-  { id: "decisions", label: "Decisions", ready: false, deterministic: false },
+  { id: "decisions", label: "Decisions", ready: true, deterministic: false },
   { id: "scaffold", label: "Scaffold", ready: false, deterministic: false },
 ];
 
@@ -25,6 +26,7 @@ export function NotebookView() {
   const pendingCount = pending.find((p) => p.kind === tab)?.count ?? 0;
   const generatedAt = reports?.[tab]?.generated_at ?? null;
   const gapsPayload = (reports?.gaps?.payload ?? null) as GapPayload | null;
+  const decisionsPayload = (reports?.decisions?.payload ?? null) as DecisionPayload | null;
 
   return (
     <div>
@@ -83,6 +85,13 @@ export function NotebookView() {
           <GapsTab payload={gapsPayload} />
         ) : (
           <p className="mono-label" style={{ color: "var(--fg-faint)" }}>No gap analysis yet.</p>
+        ))}
+
+      {tab === "decisions" &&
+        (decisionsPayload ? (
+          <DecisionsTab payload={decisionsPayload} />
+        ) : (
+          <p className="mono-label" style={{ color: "var(--fg-faint)" }}>No decision worksheet yet.</p>
         ))}
     </div>
   );

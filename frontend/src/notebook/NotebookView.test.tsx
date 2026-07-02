@@ -26,8 +26,16 @@ describe("NotebookView", () => {
     expect(screen.getByText(/No gap analysis yet/)).toBeTruthy();
   });
 
-  it("keeps Decisions disabled (still coming soon)", () => {
+  it("has an enabled, switchable Decisions tab", () => {
     render(<NotebookView />);
-    expect((screen.getByRole("button", { name: "Decisions" }) as HTMLButtonElement).disabled).toBe(true);
+    const decisions = screen.getByRole("button", { name: "Decisions" }) as HTMLButtonElement;
+    expect(decisions.disabled).toBe(false);
+    fireEvent.click(decisions);
+    expect(screen.getByText(/No decision worksheet yet/)).toBeTruthy();
+  });
+
+  it("keeps Scaffold disabled (still coming soon)", () => {
+    render(<NotebookView />);
+    expect((screen.getByRole("button", { name: "Scaffold" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
