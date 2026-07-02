@@ -47,6 +47,20 @@ export interface GapPayload {
   criteria: GapCriterion[];
 }
 
+// Decision worksheet (AI-authored offline, published via /publish). Renders as a checklist.
+export type DecisionMissing = "why" | "numbers" | "alternatives" | "result";
+export interface Decision {
+  title: string; // "Switched 6-wheel to 4-wheel drivetrain"
+  date?: string;
+  subsystem?: string;
+  chosen: string; // what was chosen, taken from logged data
+  missing: DecisionMissing[]; // what a human must still add
+  prompt: string; // "Explain why 4-wheel won and the numbers behind it"
+}
+export interface DecisionPayload {
+  decisions: Decision[];
+}
+
 // Deterministic coverage stats (Worker-computed) that the reasoning interprets.
 export interface CoverageSubsystem {
   name: string;
@@ -73,7 +87,7 @@ export interface SeasonExport {
 }
 
 // Widens as later report kinds land (gaps, decisions, scaffold).
-export type ReportPayload = TimelinePayload | GapPayload;
+export type ReportPayload = TimelinePayload | GapPayload | DecisionPayload;
 
 export interface NotebookReport {
   id: string;
