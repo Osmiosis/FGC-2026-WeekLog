@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import app from "../src/index";
-import { makeTestDb, testEnv, stubSupabaseAuth } from "./helpers/d1";
+import { makeTestDb, testEnv } from "./helpers/d1";
 
 const ADMIN = { Authorization: "Bearer admin-token" };
 const MEMBER = { Authorization: "Bearer member-token" };
@@ -9,7 +9,6 @@ describe("members CRUD", () => {
   let env: Record<string, unknown>;
 
   beforeEach(() => {
-    stubSupabaseAuth();
     env = testEnv(makeTestDb());
   });
 

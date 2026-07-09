@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import app from "../src/index";
 import { addDaysUTC } from "../src/compliance";
-import { makeTestDb, testEnv, stubSupabaseAuth } from "./helpers/d1";
+import { makeTestDb, testEnv } from "./helpers/d1";
 
 const ADMIN = { Authorization: "Bearer admin-token" };
 const MEMBER = { Authorization: "Bearer member-token" };
@@ -35,7 +35,6 @@ describe("dashboard", () => {
   let env: Record<string, unknown>;
 
   beforeEach(async () => {
-    stubSupabaseAuth();
     env = testEnv(makeTestDb());
     // Remove the seeded deadline so each test controls the deadline set.
     await app.request("/api/deadlines/dl-sm-1", { method: "DELETE", headers: ADMIN }, env as never);

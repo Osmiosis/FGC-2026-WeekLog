@@ -78,35 +78,16 @@ export function makeR2Stub() {
   };
 }
 
-// Test Env factory. fetch is stubbed per-test to resolve the bearer token.
+// Test Env factory. Better Auth sessions are resolved deterministically by the
+// global `better-auth` mock in test/setup.ts based on the request's bearer token.
 export function testEnv(db: D1Shim): Record<string, unknown> {
   return {
     DB: db,
     MEDIA: makeR2Stub(),
-    SUPABASE_URL: "https://test.supabase.co",
-    SUPABASE_ANON_KEY: "test-anon",
     ADMIN_EMAIL: "vibha.aarav@gmail.com",
+    BETTER_AUTH_URL: "https://w.test",
+    BETTER_AUTH_SECRET: "x".repeat(32),
+    GOOGLE_CLIENT_ID: "gid",
+    GOOGLE_CLIENT_SECRET: "gsecret",
   };
-}
-
-// Stub global fetch so Supabase token verification resolves deterministically.
-// "admin-token" -> the admin email; "member-token" -> a member; anything else -> 401.
-export function stubSupabaseAuth(): void {
-  const fn = async (_url: string, init?: { headers?: Record<string, string> }) => {
-    const auth = init?.headers?.Authorization ?? "";
-    if (auth.includes("admin-token")) {
-      return new Response(
-        JSON.stringify({ id: "u-admin", email: "vibha.aarav@gmail.com" }),
-        { status: 200 }
-      );
-    }
-    if (auth.includes("member-token")) {
-      return new Response(JSON.stringify({ id: "u-mem", email: "kid@example.com" }), {
-        status: 200,
-      });
-    }
-    return new Response("invalid", { status: 401 });
-  };
-  // @ts-expect-error replacing global fetch for tests
-  globalThis.fetch = fn;
 }

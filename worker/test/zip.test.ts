@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { unzipSync, strFromU8 } from "fflate";
 import app from "../src/index";
-import { makeTestDb, testEnv, stubSupabaseAuth } from "./helpers/d1";
+import { makeTestDb, testEnv } from "./helpers/d1";
 
 const ADMIN = { Authorization: "Bearer admin-token" };
 const MEMBER = { Authorization: "Bearer member-token" };
@@ -17,7 +17,6 @@ describe("zip export + drive seam", () => {
   const photoBytes = new Uint8Array([10, 20, 30, 40]);
 
   beforeEach(async () => {
-    stubSupabaseAuth();
     env = testEnv(makeTestDb());
     const mk = await app.request(
       "/api/meeting-days",
