@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env, Variables } from "./bindings";
-import { requireUser, isAdmin, createAuth } from "./auth";
+import { requireUser, isAdmin, createAuth, frontendOrigins } from "./auth";
 import { members } from "./routes/members";
 import { committees } from "./routes/committees";
 import { templates } from "./routes/templates";
@@ -23,7 +23,10 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 app.use(
   "/api/*",
   cors({
-    origin: (_origin, c) => c.env?.FRONTEND_ORIGIN ?? "*",
+    origin: (origin, c) => {
+      const allowed = frontendOrigins(c.env);
+      return origin && allowed.includes(origin) ? origin : (allowed[0] ?? "*");
+    },
     allowHeaders: ["Authorization", "Content-Type"],
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     exposeHeaders: ["set-auth-token"],
@@ -38,7 +41,7 @@ app.get("/api/health", (c) => c.json({ ok: true, service: "weeklog-worker" }));
 // Identity probe: who am I, and am I the admin.
 app.get("/api/me", requireUser, (c) => {
   const user = c.get("user");
-  return c.json({ email: user.email, isAdmin: isAdmin(c.env, user) });
+  return c.json({ email: user.email, isAdmin: isAdmin(c.env, user, c.req.header("origin")) });
 });
 
 app.route("/api/members", members);

@@ -8,8 +8,11 @@ export interface Env {
   BETTER_AUTH_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
-  // Demo: when "true", every signed-in user is treated as admin.
+  // Demo: when "true", every signed-in user is treated as admin (all origins).
   DEMO_ALL_ADMIN?: string;
+  // Per-site demo: requests from this exact origin treat every signed-in user as
+  // admin (the demo Pages site), while other origins use ADMIN_EMAIL gating.
+  DEMO_ORIGIN?: string;
   // Optional Drive connector config (v1 ships the NullDriveConnector). See drive.ts.
   DRIVE_ENABLED?: string;
   DRIVE_FOLDER_ID?: string;

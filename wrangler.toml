@@ -19,11 +19,15 @@ bucket_name = "weeklog-media"
 # Public, non-secret config (safe to commit).
 [vars]
 ADMIN_EMAIL = "vibha.aarav@gmail.com"
-FRONTEND_ORIGIN = "https://weeklog.pages.dev"
+# Comma-separated allowed frontend origins (CORS + Better Auth trustedOrigins).
+FRONTEND_ORIGIN = "https://weeklog.pages.dev,https://fgc-weeklog-demo.pages.dev"
+# The demo site: requests from this origin treat every signed-in user as admin.
+DEMO_ORIGIN = "https://fgc-weeklog-demo.pages.dev"
 # Better Auth base URL = this Worker's own origin (used to build the Google callback).
 BETTER_AUTH_URL = "https://weeklog-worker.fgcworker.workers.dev"
-# Demo: every signed-in user is admin. Unset/omit in a real production deploy.
-DEMO_ALL_ADMIN = "true"
+# Role model: only ADMIN_EMAIL (vibha.aarav@gmail.com) is admin; everyone else who
+# signs in is a member. Set to "true" to make EVERY signed-in user admin (open demo).
+DEMO_ALL_ADMIN = "false"
 
 # Secrets (set once, never commit):
 #   wrangler secret put BETTER_AUTH_SECRET   # 32+ random chars

@@ -48,4 +48,25 @@ describe("auth + /api/me", () => {
     const res2 = await app.request("/api/me", { headers: { Authorization: "Bearer t" } }, baseEnv);
     expect(await res2.json()).toEqual({ email: "admin@example.com", isAdmin: true });
   });
+
+  it("requests from DEMO_ORIGIN make any signed-in user admin; other origins do not", async () => {
+    getSession.mockResolvedValue({ user: { id: "1", email: "kid@example.com" } });
+    const env = { ...baseEnv, DEMO_ORIGIN: "https://demo.example.com" } as unknown as Env;
+
+    // From the demo origin: non-admin email becomes admin.
+    const demo = await app.request(
+      "/api/me",
+      { headers: { Authorization: "Bearer t", Origin: "https://demo.example.com" } },
+      env
+    );
+    expect(await demo.json()).toEqual({ email: "kid@example.com", isAdmin: true });
+
+    // From the main origin: same user is only a member.
+    const main = await app.request(
+      "/api/me",
+      { headers: { Authorization: "Bearer t", Origin: "https://main.example.com" } },
+      env
+    );
+    expect(await main.json()).toEqual({ email: "kid@example.com", isAdmin: false });
+  });
 });
