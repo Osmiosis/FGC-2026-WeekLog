@@ -13,6 +13,8 @@ I've been a team member of TEAM ROBOTICS QATAR for 2 years now, and I'd always h
 
 **Features:**
 
+**NEW Google Account Logins!**
+
 **Calendar:**
 Where you can select meeting days and see at a glance what's complete, missing or pending. 
 <img width="2559" height="1475" alt="image" src="https://github.com/user-attachments/assets/86bbbff0-3774-4600-b792-efef4be33185" />
