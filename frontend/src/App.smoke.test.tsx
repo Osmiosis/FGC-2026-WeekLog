@@ -1,18 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
-const useSession = vi.fn();
+const getStoredToken = vi.fn();
 vi.mock("./lib/auth-client", () => ({
   isConfigured: true,
   GOOGLE_CLIENT_ID: "gid",
-  getStoredToken: () => "tok",
+  API_BASE: "",
+  TOKEN_KEY: "weeklog_bearer",
+  getStoredToken: () => getStoredToken(),
   clearToken: vi.fn(),
   storeToken: vi.fn(),
-  authClient: {
-    useSession: () => useSession(),
-    signOut: vi.fn().mockResolvedValue({}),
-    signIn: { social: vi.fn().mockResolvedValue({ error: null }) },
-  },
+  signInWithGoogleIdToken: vi.fn().mockResolvedValue({ error: null }),
+  signOutRequest: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Shared by every api() consumer in the tree (AuthProvider's /api/me check,
@@ -38,14 +37,15 @@ vi.mock("./lib/api", () => ({ api: (path: string) => apiImpl(path) }));
 import App from "./App";
 
 describe("App auth gating", () => {
-  it("shows the login wall when signed out", () => {
-    useSession.mockReturnValue({ data: null, isPending: false });
+  it("shows the login wall when signed out (no stored token)", async () => {
+    getStoredToken.mockReturnValue(null);
     render(<App />);
-    expect(screen.getByText(/THE TEAM/i)).toBeTruthy();
+    // refresh() runs on mount; once it resolves (no token) the wall renders.
+    await waitFor(() => expect(screen.getByText(/THE TEAM/i)).toBeTruthy());
   });
 
   it("renders the authed app shell with admin nav for a signed-in admin session", async () => {
-    useSession.mockReturnValue({ data: { user: { email: "u@x.com" } }, isPending: false });
+    getStoredToken.mockReturnValue("tok");
     render(<App />);
 
     // Regular nav renders for any signed-in session.

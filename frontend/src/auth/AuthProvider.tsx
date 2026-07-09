@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // PROTECTED WIRING — owns the auth session and role. Build login/role UI on
-// top of useAuth(). Backed by Better Auth (Google, bearer tokens).
+// top of useAuth(). Backed by Better Auth (Google, bearer tokens) via direct
+// fetch: sign-in exchanges the Google ID token for a bearer token, and /api/me
+// (which we control) is the single source of truth for signed-in + role.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { authClient, clearToken, getStoredToken } from "../lib/auth-client";
+import { getStoredToken, signInWithGoogleIdToken, signOutRequest } from "../lib/auth-client";
 import { api } from "../lib/api";
 
 interface AuthState {
@@ -12,49 +14,64 @@ interface AuthState {
   isAdmin: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
-  // Exchange a Google ID token for a Better Auth session.
+  // Exchange a Google ID token for a session, then refresh from /api/me.
   signInWithGoogle: (idToken: string) => Promise<{ error: string | null }>;
 }
+
+type SessionState = { loading: boolean; session: boolean; email: string | null; isAdmin: boolean };
+const SIGNED_OUT: SessionState = { loading: false, session: false, email: null, isAdmin: false };
 
 const Ctx = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { data, isPending } = authClient.useSession();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [state, setState] = useState<SessionState>({ ...SIGNED_OUT, loading: true });
 
-  const signedIn = Boolean(data?.user?.email) && Boolean(getStoredToken());
-
-  useEffect(() => {
-    if (!signedIn) {
-      setIsAdmin(false);
+  // Read identity + role from /api/me using the stored bearer token. This is the
+  // single source of truth: a token that /api/me accepts means signed-in.
+  const refresh = useCallback(async () => {
+    if (!getStoredToken()) {
+      setState(SIGNED_OUT);
       return;
     }
-    // Only trust a successful response; a transient failure must not demote.
-    api<{ email: string; isAdmin: boolean }>("/api/me")
-      .then((me) => setIsAdmin(me.isAdmin))
-      .catch(() => {});
-  }, [signedIn]);
-
-  const signOut = useCallback(async () => {
-    await authClient.signOut().catch(() => {});
-    clearToken();
+    try {
+      const me = await api<{ email: string; isAdmin: boolean }>("/api/me");
+      if (me.email) {
+        setState({ loading: false, session: true, email: me.email, isAdmin: me.isAdmin });
+      } else {
+        setState(SIGNED_OUT);
+      }
+    } catch {
+      // api() clears the token on a 401; treat any failure here as signed-out.
+      setState(SIGNED_OUT);
+    }
   }, []);
 
-  const signInWithGoogle = useCallback(async (idToken: string) => {
-    const { error } = await authClient.signIn.social({
-      provider: "google",
-      idToken: { token: idToken },
-    });
-    return { error: error ? (error.message ?? "Sign-in failed") : null };
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const signInWithGoogle = useCallback(
+    async (idToken: string) => {
+      const { error } = await signInWithGoogleIdToken(idToken);
+      if (error) return { error };
+      await refresh();
+      return { error: null };
+    },
+    [refresh]
+  );
+
+  const signOut = useCallback(async () => {
+    await signOutRequest();
+    setState(SIGNED_OUT);
   }, []);
 
   return (
     <Ctx.Provider
       value={{
-        session: signedIn,
-        email: data?.user?.email ?? null,
-        isAdmin,
-        loading: isPending,
+        session: state.session,
+        email: state.email,
+        isAdmin: state.isAdmin,
+        loading: state.loading,
         signOut,
         signInWithGoogle,
       }}
