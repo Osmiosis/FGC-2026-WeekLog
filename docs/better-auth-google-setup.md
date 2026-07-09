@@ -39,18 +39,17 @@ git branch-naming detail only, it doesn't affect any URL above.)
    - User type: **External**.
    - App name: `Team Qatar WeekLog` (or similar), support email: your email.
    - Scopes: leave default (`.../auth/userinfo.email`, `.../auth/userinfo.profile`,
-     `openid`) — no extra scopes needed.
-   - Test users: add the Gmail addresses that will sign in during the demo
-     (**Publishing status: Testing** is fine — no Google verification review needed for
-     a small, known set of testers; unverified apps just show an "unverified app"
-     interstitial the first time each tester signs in, which they click through).
-   - **Important — Testing mode restricts who can sign in:** while the consent screen's
-     publishing status is **Testing**, ONLY Google accounts explicitly added under
-     **Audience → Test users** (up to 100) can complete sign-in — anyone else gets
-     blocked at the Google consent step, even though the app UI invites "sign in with
-     any Google account." Before the demo, add every reviewer's/tester's Gmail address
-     as a test user, OR publish the app (**OAuth consent screen → Publishing status →
-     Publish App**) to allow any Google account.
+     `openid`) — no extra scopes needed. These are **non-sensitive** scopes.
+   - **PUBLISH the app so ANY Google account can sign in (the demo requirement):**
+     **OAuth consent screen → Publishing status → PUBLISH APP** (moves it from Testing
+     to **In production**). Because the app requests only the non-sensitive
+     email/profile/openid scopes above, **publishing does NOT trigger Google's
+     verification review** — any Google user can sign in right away. They may see a
+     one-time "Google hasn't verified this app" interstitial (click **Advanced → Go to
+     Team Qatar WeekLog**); this does not restrict who can sign in.
+   - (Alternative, NOT used here: leaving publishing status **Testing** restricts
+     sign-in to Google accounts explicitly added under **Audience → Test users** (≤100).
+     We publish instead, so no test-user allow-list is needed.)
 3. **APIs & Services → Credentials → + Create Credentials → OAuth client ID**:
    - Application type: **Web application**.
    - Name: `WeekLog Web`.
@@ -94,8 +93,8 @@ DEMO_ALL_ADMIN = "true"
   callback URL (`{BETTER_AUTH_URL}/api/auth/callback/google`), which must exactly match
   the redirect URI registered in Step 1.
 - `DEMO_ALL_ADMIN = "true"` — **demo-only escape hatch**: every signed-in user is treated
-  as admin, regardless of email, so any Google account you add as a test user can exercise
-  admin-only routes. In a real production deploy, remove this var entirely; the app then
+  as admin, regardless of email, so any Google account (the app is published, so anyone can
+  sign in) can exercise admin-only routes. In a real production deploy, remove this var entirely; the app then
   falls back to single-admin gating (`ADMIN_EMAIL = vibha.aarav@gmail.com`) where only
   that account gets `isAdmin: true` from `/api/me` and everyone else gets 403 on
   `requireAdmin` routes.
