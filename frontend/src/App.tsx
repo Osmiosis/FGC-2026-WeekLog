@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isConfigured } from "./lib/supabase";
+import { isConfigured } from "./lib/auth-client";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { Login } from "./auth/Login";
 import { Dashboard } from "./dashboard/Dashboard";
@@ -45,15 +45,13 @@ function Shell() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [calendarDayId, setCalendarDayId] = useState<string | null>(null);
   const [more, setMore] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
 
   const openDay = (id: string) => { setCalendarDayId(id); setTab("calendar"); };
   const go = (t: Tab) => { setCalendarDayId(null); setTab(t); setMore(false); };
 
   if (loading) return <div className="tq" style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}><p className="mono-label">Loading...</p></div>;
-  // Open access: no login wall. The app is public; admins sign in on demand to
-  // unlock admin controls. The overlay auto-dismisses once isAdmin flips true.
-  if (showLogin && !isAdmin) return <Login onBack={() => setShowLogin(false)} />;
+  // Login wall: must sign in with Google to enter.
+  if (!session) return <Login />;
 
   const labelFor = (t: Tab) => MAIN.concat(ADMIN).find((x) => x.id === t)?.label ?? "";
 
@@ -81,18 +79,14 @@ function Shell() {
             <nav style={{ display: "grid", gap: 3 }}>{ADMIN.map((t) => <NavItem key={t.id} t={t} active={tab === t.id} onClick={() => go(t.id)} />)}</nav>
           </>}
           <div style={{ marginTop: "auto", borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-            {isAdmin ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 50, background: "var(--maroon)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, flex: "none" }}>{(email ?? "?").slice(0, 2).toUpperCase()}</div>
-                <div style={{ lineHeight: 1.2, overflow: "hidden", flex: 1 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
-                  <div className="mono-label" style={{ fontSize: 9 }}>Admin</div>
-                </div>
-                <button className="btn btn-ghost btn-sm" style={{ width: 34, padding: 0, justifyContent: "center" }} onClick={signOut} title="Sign out"><Icon name="arrow" size={15} style={{ transform: "rotate(180deg)" }} /></button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 50, background: "var(--maroon)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, flex: "none" }}>{(email ?? "?").slice(0, 2).toUpperCase()}</div>
+              <div style={{ lineHeight: 1.2, overflow: "hidden", flex: 1 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
+                <div className="mono-label" style={{ fontSize: 9 }}>{isAdmin ? "Admin" : "Member"}</div>
               </div>
-            ) : (
-              <button className="btn btn-ghost btn-sm" style={{ width: "100%" }} onClick={() => setShowLogin(true)}>Admin sign in</button>
-            )}
+              <button className="btn btn-ghost btn-sm" style={{ width: 34, padding: 0, justifyContent: "center" }} onClick={signOut} title="Sign out"><Icon name="arrow" size={15} style={{ transform: "rotate(180deg)" }} /></button>
+            </div>
           </div>
         </aside>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -137,17 +131,11 @@ function Shell() {
               ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderTop: "1px solid var(--line)" }}>
-              {isAdmin ? (
-                <>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
-                    <div className="mono-label" style={{ fontSize: 9 }}>Admin</div>
-                  </div>
-                  <button className="btn btn-sm" onClick={signOut}>Sign out</button>
-                </>
-              ) : (
-                <button className="btn btn-sm" style={{ flex: 1 }} onClick={() => { setMore(false); setShowLogin(true); }}>Admin sign in</button>
-              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
+                <div className="mono-label" style={{ fontSize: 9 }}>{isAdmin ? "Admin" : "Member"}</div>
+              </div>
+              <button className="btn btn-sm" onClick={signOut}>Sign out</button>
             </div>
           </div>
         </>
@@ -179,7 +167,7 @@ export default function App() {
     return (
       <div className="tq" style={{ minHeight: "100vh", padding: 32 }}>
         <h1 className="display">Setup needed</h1>
-        <p style={{ color: "var(--fg-dim)" }}>Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to frontend/.env, then restart the dev server.</p>
+        <p style={{ color: "var(--fg-dim)" }}>Auth is not configured. Set VITE_API_BASE (the Worker URL) and VITE_GOOGLE_CLIENT_ID in frontend/.env, then restart the dev server.</p>
       </div>
     );
   }

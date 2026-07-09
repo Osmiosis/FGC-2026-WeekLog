@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // PROTECTED WIRING — do not edit during design work.
-// All network access goes through here: it attaches the Supabase bearer token
-// (refreshing it when expired) and targets the API base. Changing it can break
-// auth and every data call. Design agents: use the hooks in src/lib/hooks.
+// All network access goes through here: it attaches the Better Auth bearer
+// token from local storage (validated server-side; no client-side refresh)
+// and targets the API base. Changing it can break auth and every data call.
+// Design agents: use the hooks in src/lib/hooks.
 // ─────────────────────────────────────────────────────────────────────────────
 import { getStoredToken } from "./auth-client";
 

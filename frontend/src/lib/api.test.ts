@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the Supabase client so api() has a token to attach.
-vi.mock("./supabase", () => ({
+// Mock the Better Auth client so api() has a stored token to attach.
+vi.mock("./auth-client", () => ({
   isConfigured: true,
-  supabase: {
-    auth: {
-      getSession: async () => ({
-        data: { session: { access_token: "tok123", expires_at: Math.floor(Date.now() / 1000) + 3600 } },
-      }),
-      refreshSession: async () => ({ data: { session: { access_token: "tok123" } } }),
-    },
-  },
+  GOOGLE_CLIENT_ID: "gid",
+  getStoredToken: () => "tok123",
+  clearToken: vi.fn(),
+  storeToken: vi.fn(),
+  authClient: {},
 }));
 
 import { api } from "./api";
