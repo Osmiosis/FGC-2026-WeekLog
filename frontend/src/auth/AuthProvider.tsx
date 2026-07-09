@@ -1,52 +1,31 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PROTECTED WIRING — do not edit during design work.
-// Owns the auth session and role. Build login/role UI on top of useAuth().
+// PROTECTED WIRING — owns the auth session and role. Build login/role UI on
+// top of useAuth(). Backed by Better Auth (Google, bearer tokens).
 // ─────────────────────────────────────────────────────────────────────────────
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
-import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { authClient, clearToken, getStoredToken } from "../lib/auth-client";
 import { api } from "../lib/api";
 
 interface AuthState {
-  session: Session | null;
+  session: boolean;
   email: string | null;
   isAdmin: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
-  // Send a passwordless magic link to the given email.
-  sendMagicLink: (email: string) => Promise<{ error: string | null }>;
+  // Exchange a Google ID token for a Better Auth session.
+  signInWithGoogle: (idToken: string) => Promise<{ error: string | null }>;
 }
 
 const Ctx = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const { data, isPending } = authClient.useSession();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+
+  const signedIn = Boolean(data?.user?.email) && Boolean(getStoredToken());
 
   useEffect(() => {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!session) {
+    if (!signedIn) {
       setIsAdmin(false);
       return;
     }
@@ -54,30 +33,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api<{ email: string; isAdmin: boolean }>("/api/me")
       .then((me) => setIsAdmin(me.isAdmin))
       .catch(() => {});
-  }, [session]);
+  }, [signedIn]);
 
   const signOut = async () => {
-    await supabase?.auth.signOut();
+    await authClient.signOut().catch(() => {});
+    clearToken();
   };
 
-  const sendMagicLink = async (email: string) => {
-    if (!supabase) return { error: "Auth is not configured." };
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
+  const signInWithGoogle = async (idToken: string) => {
+    const { error } = await authClient.signIn.social({
+      provider: "google",
+      idToken: { token: idToken },
     });
-    return { error: error ? error.message : null };
+    return { error: error ? (error.message ?? "Sign-in failed") : null };
   };
 
   return (
     <Ctx.Provider
       value={{
-        session,
-        email: session?.user.email ?? null,
+        session: signedIn,
+        email: data?.user?.email ?? null,
         isAdmin,
-        loading,
+        loading: isPending,
         signOut,
-        sendMagicLink,
+        signInWithGoogle,
       }}
     >
       {children}

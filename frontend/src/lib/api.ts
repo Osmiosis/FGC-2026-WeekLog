@@ -4,24 +4,16 @@
 // (refreshing it when expired) and targets the API base. Changing it can break
 // auth and every data call. Design agents: use the hooks in src/lib/hooks.
 // ─────────────────────────────────────────────────────────────────────────────
-import { supabase } from "./supabase";
+import { getStoredToken } from "./auth-client";
 
 // In dev this is empty and the Vite proxy forwards /api to the local Worker.
 // In production set VITE_API_BASE to the deployed Worker URL.
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
-// Return a valid access token, refreshing it if it has expired or is about to.
+// Return the stored bearer token, if any. Better Auth validates it server-side;
+// an expired token yields a 401 and the app returns the user to the login wall.
 async function getFreshToken(): Promise<string | null> {
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
-  const session = data.session;
-  if (!session) return null;
-  const expiresAtMs = (session.expires_at ?? 0) * 1000;
-  if (expiresAtMs - Date.now() < 60_000) {
-    const refreshed = await supabase.auth.refreshSession();
-    return refreshed.data.session?.access_token ?? null;
-  }
-  return session.access_token;
+  return getStoredToken();
 }
 
 export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
