@@ -52,7 +52,7 @@ Replace the `[vars]` block (remove Supabase, add Better Auth + demo flag). Keep 
 ADMIN_EMAIL = "vibha.aarav@gmail.com"
 FRONTEND_ORIGIN = "https://weeklog.pages.dev"
 # Better Auth base URL = this Worker's own origin (used to build the Google callback).
-BETTER_AUTH_URL = "https://weeklog-worker.workers.dev"
+BETTER_AUTH_URL = "https://weeklog-worker.fgcworker.workers.dev"
 # Demo: every signed-in user is admin. Unset/omit in a real production deploy.
 DEMO_ALL_ADMIN = "true"
 
@@ -794,7 +794,7 @@ git commit -m "feat(auth): Google login wall (GIS) and app gating"
 
 - [ ] **Step 1: Write `docs/better-auth-google-setup.md`**
 
-Include, as concrete steps: (1) Google Cloud Console — create project, OAuth consent screen (External/Testing), Web OAuth client; **Authorized JavaScript origins** = `https://weeklog.pages.dev` and `http://localhost:5173`; **Authorized redirect URIs** = `https://weeklog-worker.workers.dev/api/auth/callback/google`. (2) Copy Client ID/Secret. (3) Worker secrets: `wrangler secret put BETTER_AUTH_SECRET|GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET`; confirm `DEMO_ALL_ADMIN="true"` and `BETTER_AUTH_URL` in `wrangler.toml`. (4) Apply migration: `wrangler d1 migrations apply weeklog --remote`. (5) Frontend env: `VITE_API_BASE`, `VITE_GOOGLE_CLIENT_ID`. (6) Verify: open the site → login wall → sign in with Google → repeat sign-out/sign-in several times (no rate limit).
+Include, as concrete steps: (1) Google Cloud Console — create project, OAuth consent screen (External/Testing), Web OAuth client; **Authorized JavaScript origins** = `https://weeklog.pages.dev` and `http://localhost:5173`; **Authorized redirect URIs** = `https://weeklog-worker.fgcworker.workers.dev/api/auth/callback/google`. (2) Copy Client ID/Secret. (3) Worker secrets: `wrangler secret put BETTER_AUTH_SECRET|GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET`; confirm `DEMO_ALL_ADMIN="true"` and `BETTER_AUTH_URL` in `wrangler.toml`. (4) Apply migration: `wrangler d1 migrations apply weeklog --remote`. (5) Frontend env: `VITE_API_BASE`, `VITE_GOOGLE_CLIENT_ID`. (6) Verify: open the site → login wall → sign in with Google → repeat sign-out/sign-in several times (no rate limit).
 
 - [ ] **Step 2: Mark the Supabase doc superseded**
 
@@ -807,7 +807,7 @@ Prepend to `docs/supabase-custom-smtp-setup.md`:
 - [ ] **Step 3: Create `frontend/.env.example`**
 
 ```
-VITE_API_BASE=https://weeklog-worker.workers.dev
+VITE_API_BASE=https://weeklog-worker.fgcworker.workers.dev
 VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
 ```
 
