@@ -12,10 +12,14 @@
   },
   "dependencies": {
     "@weeklog/types": "*",
+    "better-auth": "^1.6.23",
     "fflate": "^0.8.2",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "kysely": "^0.29.3",
+    "kysely-d1": "^0.4.0"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@cloudflare/workers-types": "^4.20240909.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.16.0",

@@ -2,9 +2,14 @@
 export interface Env {
   DB: D1Database;
   MEDIA: R2Bucket;
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
   ADMIN_EMAIL: string;
+  // Better Auth
+  BETTER_AUTH_URL: string;
+  BETTER_AUTH_SECRET: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  // Demo: when "true", every signed-in user is treated as admin.
+  DEMO_ALL_ADMIN?: string;
   // Optional Drive connector config (v1 ships the NullDriveConnector). See drive.ts.
   DRIVE_ENABLED?: string;
   DRIVE_FOLDER_ID?: string;

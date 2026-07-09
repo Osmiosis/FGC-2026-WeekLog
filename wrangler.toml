@@ -1,6 +1,7 @@
 name = "weeklog-worker"
 main = "worker/src/index.ts"
 compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 
 # D1 database. Create with: wrangler d1 create weeklog
 # then paste the returned database_id below.
@@ -17,11 +18,14 @@ bucket_name = "weeklog-media"
 
 # Public, non-secret config (safe to commit).
 [vars]
-SUPABASE_URL = "https://euzvqdnonmkechsdtryr.supabase.co"
 ADMIN_EMAIL = "vibha.aarav@gmail.com"
-# Lock CORS to your deployed Pages URL once you have it (defaults to "*" if unset).
 FRONTEND_ORIGIN = "https://weeklog.pages.dev"
+# Better Auth base URL = this Worker's own origin (used to build the Google callback).
+BETTER_AUTH_URL = "https://weeklog-worker.fgcworker.workers.dev"
+# Demo: every signed-in user is admin. Unset/omit in a real production deploy.
+DEMO_ALL_ADMIN = "true"
 
-# SUPABASE_ANON_KEY (publishable key) is provided via .dev.vars for local dev.
-# For deploy, set it once with:  wrangler secret put SUPABASE_ANON_KEY
-# (It is a public key, but secret put keeps it out of the committed config.)
+# Secrets (set once, never commit):
+#   wrangler secret put BETTER_AUTH_SECRET   # 32+ random chars
+#   wrangler secret put GOOGLE_CLIENT_ID
+#   wrangler secret put GOOGLE_CLIENT_SECRET
