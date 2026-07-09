@@ -1,0 +1,66 @@
+-- Better Auth core tables (user/session/account/verification).
+-- Generated via `@better-auth/cli generate` against a throwaway local SQLite
+-- config (google provider + bearer plugin, better-auth@1.6.23), then
+-- hand-placed here because the CLI cannot reach D1 directly. Formatting and
+-- index names adjusted to match this repo's migration style; column types,
+-- nullability, and ON DELETE CASCADE foreign keys match the CLI output
+-- exactly.
+--
+-- NOTE: task-2-brief.md's Step 2 SQL differs slightly from this
+-- CLI-generated version (no ON DELETE CASCADE, verification.createdAt/
+-- updatedAt nullable, emailVerified DEFAULT 0). Per the brief: "If it
+-- differs from the SQL in Step 2, use the generated version" — this file
+-- uses the generated version.
+--
+-- Also renumbered 0004 -> 0009: 0004_submission_resolved.sql already exists
+-- in this migrations directory (the brief's task-2-brief.md predates it).
+
+CREATE TABLE user (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  email         TEXT NOT NULL UNIQUE,
+  emailVerified INTEGER NOT NULL,
+  image         TEXT,
+  createdAt     DATE NOT NULL,
+  updatedAt     DATE NOT NULL
+);
+
+CREATE TABLE session (
+  id        TEXT PRIMARY KEY,
+  expiresAt DATE NOT NULL,
+  token     TEXT NOT NULL UNIQUE,
+  createdAt DATE NOT NULL,
+  updatedAt DATE NOT NULL,
+  ipAddress TEXT,
+  userAgent TEXT,
+  userId    TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE
+);
+
+CREATE TABLE account (
+  id                    TEXT PRIMARY KEY,
+  accountId             TEXT NOT NULL,
+  providerId            TEXT NOT NULL,
+  userId                TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  accessToken           TEXT,
+  refreshToken          TEXT,
+  idToken               TEXT,
+  accessTokenExpiresAt  DATE,
+  refreshTokenExpiresAt DATE,
+  scope                 TEXT,
+  password              TEXT,
+  createdAt             DATE NOT NULL,
+  updatedAt             DATE NOT NULL
+);
+
+CREATE TABLE verification (
+  id         TEXT PRIMARY KEY,
+  identifier TEXT NOT NULL,
+  value      TEXT NOT NULL,
+  expiresAt  DATE NOT NULL,
+  createdAt  DATE NOT NULL,
+  updatedAt  DATE NOT NULL
+);
+
+CREATE INDEX idx_session_userId ON session(userId);
+CREATE INDEX idx_account_userId ON account(userId);
+CREATE INDEX idx_verification_identifier ON verification(identifier);
