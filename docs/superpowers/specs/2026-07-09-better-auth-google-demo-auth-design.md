@@ -42,7 +42,8 @@ be **fully free**.
 | Google flow | **ID-token flow via Google Identity Services (GIS)** — NOT the redirect flow | Frontend and worker are different origins; the redirect flow needs a third-party session cookie (fragile/blocked). ID-token flow is a plain `fetch`, returns the bearer token in a header, fits the existing bearer architecture. |
 | Token transport | **Better Auth `bearer` plugin** (token in `Authorization` header) | Mirrors the existing pattern exactly; avoids cross-origin cookies. |
 | Login wall | **Yes — reverse open-access.** App requires Google sign-in to enter. | Directly answers the reviewer: auth is the first thing they see and use. |
-| Roles | `ADMIN_EMAIL` account → admin; any other Google account → member | Preserves existing role model. |
+| Roles (demo) | **Every signed-in user is admin** on the demo, gated by a `DEMO_ALL_ADMIN` worker flag | Reviewer signs in with their own Google account and gets the full admin experience with no allow-listing. |
+| Roles (prod) | Flag off → falls back to `ADMIN_EMAIL` check (admin) vs member | Production behavior preserved; single-config switch. |
 
 > **Note:** This reverses the deliberate 2026-06-22 "open access / no login wall" decision.
 > That is intentional and follows reviewer feedback, not a regression.
@@ -74,8 +75,10 @@ be **fully free**.
   - `baseURL`: worker origin (`BETTER_AUTH_URL`); `trustedOrigins`: `[FRONTEND_ORIGIN]`
   - `secret`: `BETTER_AUTH_SECRET`
   - Re-implement `requireUser` / `requireAdmin` middleware using
-    `auth.api.getSession({ headers: c.req.raw.headers })`. Admin = `session.user.email ===
-    env.ADMIN_EMAIL` (case-insensitive). Anonymous = no/invalid token.
+    `auth.api.getSession({ headers: c.req.raw.headers })`. Admin =
+    `env.DEMO_ALL_ADMIN === "true"` (any signed-in user is admin — the demo default) **OR**
+    `session.user.email === env.ADMIN_EMAIL` (case-insensitive fallback for production).
+    Anonymous = no/invalid token.
 - `src/index.ts` — mount `app.on(["GET","POST"], "/api/auth/*", c => createAuth(c.env.DB,
   c.env).handler(c.req.raw))`. CORS: exact `FRONTEND_ORIGIN`, `allowHeaders: ["Content-Type",
   "Authorization"]`, **`exposeHeaders: ["set-auth-token"]`**.
@@ -112,7 +115,8 @@ be **fully free**.
 - **Worker** (`wrangler.toml` vars + `wrangler secret put`):
   - Add: `BETTER_AUTH_URL` (worker origin), `FRONTEND_ORIGIN` (already present).
   - Secrets: `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
-  - Keep: `ADMIN_EMAIL`.
+  - Keep: `ADMIN_EMAIL` (production fallback). Add `DEMO_ALL_ADMIN = "true"` on the demo
+    deployment so every signed-in user is admin.
   - Remove: `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
   - `compatibility_flags = ["nodejs_compat"]` (Better Auth needs Node crypto built-ins).
 - **Frontend** (`.env`): `VITE_API_BASE` (worker origin), `VITE_GOOGLE_CLIENT_ID`. Remove
@@ -128,15 +132,17 @@ be **fully free**.
 
 ## Testing
 - **Worker** `test/auth.test.ts` — rewritten: mock `auth.api.getSession` to return
-  admin / member / null; assert `/api/me` and `requireAdmin` behave (200 admin, 403 member,
-  401 anonymous).
+  a signed-in user / null; assert:
+  - `DEMO_ALL_ADMIN="true"` → any signed-in user is admin (200), anonymous → 401.
+  - `DEMO_ALL_ADMIN` unset + `ADMIN_EMAIL` match → admin (200); non-matching signed-in user
+    → member (403 on admin routes); anonymous → 401.
 - **Frontend** auth smoke test — the wall renders the Google button when signed out; a mocked
   stored token + session renders the shell; admin session shows admin nav.
 - **Manual acceptance** (the reviewer's scenario):
   1. Open demo → **login wall visible**.
-  2. Sign in with a **non-admin** Google account → member view (no admin tabs).
+  2. Sign in with **any** Google account → **admin experience** (all tabs, since
+     `DEMO_ALL_ADMIN="true"` on the demo).
   3. Sign out; **sign in again 3–5 times in a row → no rate limit** (proves the fix).
-  4. Sign in with the **`ADMIN_EMAIL`** account → admin tabs unlock.
 
 ## Deliverable docs
 - `docs/better-auth-google-setup.md` — exact reproducible click-path: Google Cloud setup,
