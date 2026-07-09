@@ -13,7 +13,7 @@ export function createAuth(db: D1Database, env: Env) {
     secret: env.BETTER_AUTH_SECRET,
     basePath: "/api/auth",
     database: { type: "sqlite", dialect: new D1Dialect({ database: db }) },
-    trustedOrigins: [env.FRONTEND_ORIGIN ?? "*"],
+    trustedOrigins: [env.FRONTEND_ORIGIN ?? "http://localhost:5173"],
     socialProviders: {
       google: {
         clientId: env.GOOGLE_CLIENT_ID,

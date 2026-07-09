@@ -5,7 +5,7 @@
 // and targets the API base. Changing it can break auth and every data call.
 // Design agents: use the hooks in src/lib/hooks.
 // ─────────────────────────────────────────────────────────────────────────────
-import { getStoredToken } from "./auth-client";
+import { clearToken, getStoredToken } from "./auth-client";
 
 // In dev this is empty and the Vite proxy forwards /api to the local Worker.
 // In production set VITE_API_BASE to the deployed Worker URL.
@@ -23,7 +23,10 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    if (res.status === 401) clearToken();
+    throw new Error(`${res.status}: ${await res.text()}`);
+  }
   return (await res.json()) as T;
 }
 
@@ -32,7 +35,10 @@ export async function apiForm<T = unknown>(path: string, form: FormData): Promis
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: form });
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    if (res.status === 401) clearToken();
+    throw new Error(`${res.status}: ${await res.text()}`);
+  }
   return (await res.json()) as T;
 }
 
@@ -41,7 +47,10 @@ export async function apiBlobUrl(path: string): Promise<string> {
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${API_BASE}${path}`, { headers });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401) clearToken();
+    throw new Error(`${res.status}`);
+  }
   return URL.createObjectURL(await res.blob());
 }
 
@@ -51,7 +60,10 @@ export async function apiBytes(path: string): Promise<Uint8Array> {
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${API_BASE}${path}`, { headers });
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401) clearToken();
+    throw new Error(`${res.status}`);
+  }
   return new Uint8Array(await res.arrayBuffer());
 }
 

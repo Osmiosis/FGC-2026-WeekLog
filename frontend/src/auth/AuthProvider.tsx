@@ -2,7 +2,7 @@
 // PROTECTED WIRING — owns the auth session and role. Build login/role UI on
 // top of useAuth(). Backed by Better Auth (Google, bearer tokens).
 // ─────────────────────────────────────────────────────────────────────────────
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { authClient, clearToken, getStoredToken } from "../lib/auth-client";
 import { api } from "../lib/api";
 
@@ -35,18 +35,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, [signedIn]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await authClient.signOut().catch(() => {});
     clearToken();
-  };
+  }, []);
 
-  const signInWithGoogle = async (idToken: string) => {
+  const signInWithGoogle = useCallback(async (idToken: string) => {
     const { error } = await authClient.signIn.social({
       provider: "google",
       idToken: { token: idToken },
     });
     return { error: error ? (error.message ?? "Sign-in failed") : null };
-  };
+  }, []);
 
   return (
     <Ctx.Provider

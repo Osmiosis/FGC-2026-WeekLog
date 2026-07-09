@@ -44,6 +44,13 @@ git branch-naming detail only, it doesn't affect any URL above.)
      (**Publishing status: Testing** is fine — no Google verification review needed for
      a small, known set of testers; unverified apps just show an "unverified app"
      interstitial the first time each tester signs in, which they click through).
+   - **Important — Testing mode restricts who can sign in:** while the consent screen's
+     publishing status is **Testing**, ONLY Google accounts explicitly added under
+     **Audience → Test users** (up to 100) can complete sign-in — anyone else gets
+     blocked at the Google consent step, even though the app UI invites "sign in with
+     any Google account." Before the demo, add every reviewer's/tester's Gmail address
+     as a test user, OR publish the app (**OAuth consent screen → Publishing status →
+     Publish App**) to allow any Google account.
 3. **APIs & Services → Credentials → + Create Credentials → OAuth client ID**:
    - Application type: **Web application**.
    - Name: `WeekLog Web`.
