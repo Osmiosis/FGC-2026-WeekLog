@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env, Variables } from "./bindings";
-import { requireUser, isAdmin } from "./auth";
+import { requireUser, isAdmin, createAuth } from "./auth";
 import { members } from "./routes/members";
 import { committees } from "./routes/committees";
 import { templates } from "./routes/templates";
@@ -26,8 +26,12 @@ app.use(
     origin: (_origin, c) => c.env?.FRONTEND_ORIGIN ?? "*",
     allowHeaders: ["Authorization", "Content-Type"],
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    exposeHeaders: ["set-auth-token"],
   })
 );
+
+// Better Auth handles all /api/auth/* routes (Google sign-in, session, sign-out).
+app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env.DB, c.env).handler(c.req.raw));
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "weeklog-worker" }));
 

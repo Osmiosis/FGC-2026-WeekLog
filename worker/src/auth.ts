@@ -1,62 +1,61 @@
 import { createMiddleware } from "hono/factory";
 import type { Context } from "hono";
+import { betterAuth } from "better-auth";
+import { bearer } from "better-auth/plugins";
+import { D1Dialect } from "kysely-d1";
 import type { Env, AuthUser, Variables } from "./bindings";
 
-// Verify a Supabase access token by asking Supabase who it belongs to.
-// No JWT secret needed: the /auth/v1/user endpoint validates the token for us.
-export async function getUser(env: Env, token: string): Promise<AuthUser | null> {
-  try {
-    const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        apikey: env.SUPABASE_ANON_KEY,
+// Per-request factory: the D1 binding only exists inside a request, so we must
+// NOT construct betterAuth at module scope.
+export function createAuth(db: D1Database, env: Env) {
+  return betterAuth({
+    baseURL: env.BETTER_AUTH_URL,
+    secret: env.BETTER_AUTH_SECRET,
+    basePath: "/api/auth",
+    database: { type: "sqlite", dialect: new D1Dialect({ database: db }) },
+    trustedOrigins: [env.FRONTEND_ORIGIN ?? "*"],
+    socialProviders: {
+      google: {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
       },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { id?: string; email?: string };
-    if (!data || !data.email) return null;
-    return { id: data.id ?? "", email: data.email };
-  } catch {
-    return null;
-  }
+    },
+    plugins: [bearer()],
+  });
 }
+export type Auth = ReturnType<typeof createAuth>;
 
+// Demo: every signed-in user is admin. Otherwise fall back to the configured admin.
 export function isAdmin(env: Env, user: AuthUser): boolean {
+  if (!user.email) return false;
+  if (env.DEMO_ALL_ADMIN === "true") return true;
   return user.email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase();
 }
 
-function bearerToken(c: Context): string | null {
-  const header = c.req.header("Authorization") ?? "";
-  const match = header.match(/^Bearer (.+)$/i);
-  return match ? match[1] : null;
-}
-
-// Open-access model: the logbook is public at "member" level. This middleware no
-// longer blocks — it attaches the signed-in user when a valid bearer token is
-// present, otherwise an anonymous member. Routes that must stay private (admin
-// config) gate with requireAdmin below, which still enforces login.
 const ANON: AuthUser = { id: "", email: "" };
 
-export const requireUser = createMiddleware<{
-  Bindings: Env;
-  Variables: Variables;
-}>(async (c, next) => {
-  const token = bearerToken(c);
-  const user = token ? await getUser(c.env, token) : null;
-  c.set("user", user ?? ANON);
-  await next();
-});
+async function sessionUser(c: Context): Promise<AuthUser | null> {
+  const auth = createAuth(c.env.DB, c.env);
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session?.user?.email) return null;
+  return { id: session.user.id ?? "", email: session.user.email };
+}
 
-// Signed-in AND the configured admin email.
-export const requireAdmin = createMiddleware<{
-  Bindings: Env;
-  Variables: Variables;
-}>(async (c, next) => {
-  const token = bearerToken(c);
-  if (!token) return c.json({ error: "unauthorized" }, 401);
-  const user = await getUser(c.env, token);
-  if (!user) return c.json({ error: "unauthorized" }, 401);
-  if (!isAdmin(c.env, user)) return c.json({ error: "forbidden" }, 403);
-  c.set("user", user);
-  await next();
-});
+// Attaches the signed-in user (or anonymous) — never blocks.
+export const requireUser = createMiddleware<{ Bindings: Env; Variables: Variables }>(
+  async (c, next) => {
+    c.set("user", (await sessionUser(c)) ?? ANON);
+    await next();
+  }
+);
+
+// Signed-in AND admin (per isAdmin rule).
+export const requireAdmin = createMiddleware<{ Bindings: Env; Variables: Variables }>(
+  async (c, next) => {
+    const user = await sessionUser(c);
+    if (!user) return c.json({ error: "unauthorized" }, 401);
+    if (!isAdmin(c.env, user)) return c.json({ error: "forbidden" }, 403);
+    c.set("user", user);
+    await next();
+  }
+);
