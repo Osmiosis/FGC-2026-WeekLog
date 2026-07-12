@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { useDeadlines, useDeadlineProof, DEADLINE_CATEGORIES } from "../lib/hooks/useDeadlines";
 import { useMediaUrl } from "../lib/hooks/useMediaUrl";
+import { UPLOAD_ACCEPT } from "../lib/uploadAccept";
 import type { Deadline, MediaRow, Rag } from "../lib/hooks/types";
 import { Icon } from "../ui/Icon";
 import { RagTag, ScreenHead, RAG_VAR, fmtDate } from "../ui/primitives";
@@ -92,7 +93,7 @@ function Proof({ deadlineId }: { deadlineId: string }) {
       try {
         await upload(files[i]);
       } catch {
-        setErr(`Could not upload "${files[i].name}". Files must be 10 MB or smaller.`);
+        setErr(`Could not upload "${files[i].name}". Files must be 25 MB or smaller.`);
         break;
       }
     }
@@ -107,7 +108,7 @@ function Proof({ deadlineId }: { deadlineId: string }) {
           Proof{rows.length > 0 ? ` (${rows.length})` : ""}
         </span>
         <label className="btn btn-sm" style={{ cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
-          <input type="file" multiple disabled={busy} style={{ display: "none" }} onChange={onPick} />
+          <input type="file" multiple accept={UPLOAD_ACCEPT} disabled={busy} style={{ display: "none" }} onChange={onPick} />
           <Icon name="download" size={15} style={{ transform: "rotate(180deg)" }} />{" "}
           {busy ? `Uploading ${progress!.done + 1}/${progress!.total}...` : rows.length > 0 ? "Attach more" : "Attach files"}
         </label>

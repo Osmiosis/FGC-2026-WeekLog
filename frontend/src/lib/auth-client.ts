@@ -12,7 +12,15 @@ const apiBase = import.meta.env.VITE_API_BASE as string | undefined;
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
 export const API_BASE = apiBase ?? "";
-export const isConfigured = Boolean(apiBase && googleClientId);
+// DEMO SITE ONLY: exposes a one-click "Enter as reviewer" login that skips Google.
+// On automatically when the host contains "demo" (e.g. fgc-weeklog-demo.pages.dev),
+// or force it anywhere with VITE_DEMO_BYPASS=true. Never true on the main site host.
+const demoHost =
+  typeof window !== "undefined" && /(^|[.-])demo([.-]|$)/.test(window.location.hostname);
+export const DEMO_BYPASS =
+  (import.meta.env.VITE_DEMO_BYPASS as string | undefined) === "true" || demoHost;
+// Demo needs only the Worker URL; the Google client id is optional there.
+export const isConfigured = Boolean(apiBase && (googleClientId || DEMO_BYPASS));
 export const GOOGLE_CLIENT_ID = googleClientId ?? "";
 export const TOKEN_KEY = "weeklog_bearer";
 

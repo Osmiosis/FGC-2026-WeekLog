@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { useMeetingDay } from "../lib/hooks/useMeetingDay";
 import { useMediaUrl } from "../lib/hooks/useMediaUrl";
 import { SUBSYSTEMS } from "../lib/hooks/useBrowse";
+import { UPLOAD_ACCEPT } from "../lib/uploadAccept";
 import type { Requirement, AvailableRequirement, AttendanceRow, Submission, MediaRow } from "../lib/hooks/types";
 import { Icon } from "../ui/Icon";
 import { RagTag, DividerNum, fmtDate } from "../ui/primitives";
@@ -15,6 +16,15 @@ function kindForLabel(label: string): string {
   if (label.includes("Failure")) return "failure";
   if (label.includes("Strategy")) return "note";
   return "note";
+}
+
+// Some requirements are open-ended: a single meeting can surface many distinct
+// build needs (things to build for later meetings), many performance goals, and
+// many failure/iteration log entries. These keep their entry form open after the
+// first submission so every item can be logged, instead of locking after one like
+// the single-answer requirements (accomplishment, etc.).
+function isMultiEntry(kind: string): boolean {
+  return kind === "build_need" || kind === "performance_goal" || kind === "failure";
 }
 
 export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () => void }) {
@@ -69,14 +79,22 @@ export function MeetingDayDetail({ dayId, onBack }: { dayId: string; onBack: () 
       )}
 
       <div className="stagger" style={{ display: "grid", gap: 12 }}>
-        {detail.requirements.map((r) => (
+        {detail.requirements.map((r) => {
+          const kind = kindForLabel(r.label);
+          const multi = isMultiEntry(kind);
+          // Count entries already logged for this requirement's kind so the card
+          // can show "N added" on multi-entry requirements like build needs.
+          const entryCount = multi ? submissions.filter((s) => s.kind === kind).length : 0;
+          return (
           <ReqCard key={r.id} req={r} isAdmin={isAdmin} attendance={attendance}
+            multi={multi} entryCount={entryCount}
             onSetPresent={setPresent}
-            onAddText={(content, subsystem) => addSubmission({ kind: kindForLabel(r.label), content, requirementId: r.id, subsystem })}
+            onAddText={(content, subsystem) => addSubmission({ kind, content, requirementId: r.id, subsystem })}
             onUpload={(file, kind, caption) => uploadMedia({ file, kind, caption, requirementId: r.id })}
             onToggleCompulsory={() => toggleCompulsory(r.id, r.compulsory ? 0 : 1)}
             onRemove={() => { if (confirm(`Remove "${r.label}" from this meeting? Uploaded files are kept.`)) removeRequirement(r.id); }} />
-        ))}
+          );
+        })}
       </div>
 
       {isAdmin && <AddRequirement onAdd={addRequirement} loadAvailable={loadAvailable} />}
@@ -117,11 +135,13 @@ function TitleEditor({ title, onSave }: { title: string | null; onSave: (t: stri
 }
 
 function ReqCard({
-  req, isAdmin, attendance, onSetPresent, onAddText, onUpload, onToggleCompulsory, onRemove,
+  req, isAdmin, attendance, multi, entryCount, onSetPresent, onAddText, onUpload, onToggleCompulsory, onRemove,
 }: {
   req: Requirement;
   isAdmin: boolean;
   attendance: AttendanceRow[];
+  multi: boolean;
+  entryCount: number;
   onSetPresent: (memberId: string, present: number) => void;
   onAddText: (content: string, subsystem?: string) => void;
   onUpload: (file: File, kind: string, caption: string) => void;
@@ -161,13 +181,20 @@ function ReqCard({
           })}
         </div>
       )}
-      {req.expected_kind === "text" && !submitted && <TextSubmit onAdd={onAddText} />}
+      {req.expected_kind === "text" && multi && entryCount > 0 && (
+        <div className="mono-label" style={{ fontSize: 10, marginTop: 12, color: "var(--fg-dim)" }}>
+          {entryCount} added · add another below
+        </div>
+      )}
+      {req.expected_kind === "text" && (!submitted || multi) && (
+        <TextSubmit onAdd={onAddText} cta={multi && submitted ? "Add another" : "Add"} />
+      )}
       {req.expected_kind === "media" && <MediaUpload onUpload={onUpload} />}
     </div>
   );
 }
 
-function TextSubmit({ onAdd }: { onAdd: (content: string, subsystem?: string) => void }) {
+function TextSubmit({ onAdd, cta = "Add" }: { onAdd: (content: string, subsystem?: string) => void; cta?: string }) {
   const [text, setText] = useState("");
   const [sub, setSub] = useState("");
   return (
@@ -178,7 +205,7 @@ function TextSubmit({ onAdd }: { onAdd: (content: string, subsystem?: string) =>
           <option value="">No subsystem</option>
           {SUBSYSTEMS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <button className="btn btn-primary" disabled={!text} onClick={() => { if (text) { onAdd(text, sub || undefined); setText(""); } }}>Add</button>
+        <button className="btn btn-primary" disabled={!text} onClick={() => { if (text) { onAdd(text, sub || undefined); setText(""); setSub(""); } }}>{cta}</button>
       </div>
     </div>
   );
@@ -193,7 +220,7 @@ function MediaUpload({ onUpload }: { onUpload: (file: File, kind: string, captio
 
   // Upload every selected file (the hook takes one at a time, so loop). The
   // chosen kind/caption apply to all of them. Surfaces a per-file error if one
-  // exceeds the 10 MB cap and stops there.
+  // exceeds the 25 MB cap and stops there.
   const submit = async () => {
     if (!files.length) return;
     setErr(null);
@@ -202,7 +229,7 @@ function MediaUpload({ onUpload }: { onUpload: (file: File, kind: string, captio
       try {
         await onUpload(files[i], kind, caption);
       } catch {
-        setErr(`Could not upload "${files[i].name}". Files must be 10 MB or smaller.`);
+        setErr(`Could not upload "${files[i].name}". Files must be 25 MB or smaller.`);
         setProgress(null);
         return;
       }
@@ -220,7 +247,7 @@ function MediaUpload({ onUpload }: { onUpload: (file: File, kind: string, captio
   return (
     <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
       <label className="thumb striped" style={{ height: 84, border: "1px dashed var(--line-2)", cursor: busy ? "default" : "pointer", background: "transparent", display: "flex", opacity: busy ? 0.6 : 1 }}>
-        <input type="file" multiple disabled={busy} style={{ display: "none" }} onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+        <input type="file" multiple accept={UPLOAD_ACCEPT} disabled={busy} style={{ display: "none" }} onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <span className="ph" style={{ flexDirection: "column", gap: 6, height: "100%", width: "100%" }}>
           <Icon name="download" size={20} style={{ transform: "rotate(180deg)" }} />
           <span className="mono-label" style={{ fontSize: 10 }}>{pickLabel}</span>
@@ -230,7 +257,7 @@ function MediaUpload({ onUpload }: { onUpload: (file: File, kind: string, captio
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input className="input" style={{ flex: 2, minWidth: 140 }} placeholder="Caption (applied to all)" value={caption} onChange={(e) => setCaption(e.target.value)} />
         <select className="select" style={{ flex: 1, minWidth: 110 }} value={kind} onChange={(e) => setKind(e.target.value)}>
-          {["photo", "sketch", "doc", "video"].map((k) => <option key={k} value={k}>{k}</option>)}
+          {["photo", "sketch", "cad", "doc", "video"].map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
         <button className="btn btn-primary" disabled={!files.length || busy} onClick={submit}>{busy ? `Uploading ${progress!.done + 1}/${progress!.total}...` : "Upload"}</button>
       </div>

@@ -16,6 +16,9 @@ interface AuthState {
   signOut: () => Promise<void>;
   // Exchange a Google ID token for a session, then refresh from /api/me.
   signInWithGoogle: (idToken: string) => Promise<{ error: string | null }>;
+  // DEMO SITE ONLY: enter with a synthetic admin session, no Google. Reads (public
+  // requireUser routes) work; server-side admin writes have no token and will 401.
+  demoSignIn: () => void;
 }
 
 type SessionState = { loading: boolean; session: boolean; email: string | null; isAdmin: boolean };
@@ -65,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(SIGNED_OUT);
   }, []);
 
+  const demoSignIn = useCallback(() => {
+    setState({ loading: false, session: true, email: "reviewer@teamqatar.demo", isAdmin: true });
+  }, []);
+
   return (
     <Ctx.Provider
       value={{
@@ -74,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: state.loading,
         signOut,
         signInWithGoogle,
+        demoSignIn,
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthProvider";
-import { GOOGLE_CLIENT_ID } from "../lib/auth-client";
+import { GOOGLE_CLIENT_ID, DEMO_BYPASS } from "../lib/auth-client";
 
 // Passwordless Google sign-in via Google Identity Services (ID-token flow).
 // GIS renders its own button; on credential we exchange the ID token for a
@@ -12,7 +12,7 @@ declare global {
 }
 
 export function Login() {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, demoSignIn } = useAuth();
   const btnRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,9 +65,18 @@ export function Login() {
           Every meeting, every deadline, one red, amber, green view of how your documentation is doing.
         </p>
         <div style={{ marginTop: 40 }} ref={btnRef} />
+        {DEMO_BYPASS && (
+          <button
+            onClick={demoSignIn}
+            className="btn"
+            style={{ marginTop: 16, padding: "12px 22px", borderRadius: 999, fontWeight: 600 }}
+          >
+            Enter as reviewer — no Google needed
+          </button>
+        )}
         {error && <p style={{ color: "var(--bad)", fontSize: 13, marginTop: 12 }}>{error}</p>}
         <p className="mono-label" style={{ fontSize: 10, marginTop: 14, color: "var(--fg-faint)", lineHeight: 1.6 }}>
-          One tap with Google. No password, no email link.
+          One tap with Google. No password, no email link.{DEMO_BYPASS && " Demo build: reviewer access needs no sign-in."}
         </p>
       </div>
     </div>
